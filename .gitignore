@@ -1,0 +1,53 @@
+# IDE and OS specific files
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+
+# Log files
+*.log
+*.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Go backend and chaincode
+# Compiled binaries
+application-gateway-go/application-gateway-go
+chaincode-go/chaincode-go
+
+# Vendored dependencies
+application-gateway-go/vendor/
+chaincode-go/vendor/
+
+# Packaged chaincode
+*.tar.gz
+
+# Frontend (React)
+# Dependencies
+frontend/node_modules/
+
+# Production builds
+frontend/build/
+frontend/dist/
+
+# Local environment variables
+frontend/.env.local
+frontend/.env.*.local
+
+# Test coverage reports
+frontend/coverage/
+
+# --- SENSITIVE FILES --- #
+# Do NOT commit your Firebase admin SDK credentials or other secrets.
+application-gateway-go/api-server/firebase-adminsdk.json
+
+# Fabric crypto material - Private keys and user certs
+**/msp/
+**/*_sk
+
+# --- CONFIGURATION ---
+# This might contain user data or be specific to your local setup.
+# It's better to commit a template file (e.g., coordinators.json.example).
+application-gateway-go/coordinators.json

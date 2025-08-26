@@ -1,0 +1,130 @@
+Organizations:
+  - &OrdererOrg
+    Name: OrdererMSP
+    ID: OrdererMSP
+    MSPDir: ../organizations/ordererOrganizations/example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Writers:
+        Type: Signature
+        Rule: "OR('OrdererMSP.member')"
+      Admins:
+        Type: Signature
+        Rule: "OR('OrdererMSP.admin')"
+
+  - &CreatorOrg
+    Name: CreatorMSP
+    ID: CreatorMSP
+    MSPDir: ../organizations/peerOrganizations/creator.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('CreatorMSP.admin', 'CreatorMSP.peer', 'CreatorMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('CreatorMSP.admin', 'CreatorMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('CreatorMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('CreatorMSP.peer')"
+
+  - &ApproverOrg
+    Name: ApproverMSP
+    ID: ApproverMSP
+    MSPDir: ../organizations/peerOrganizations/approver.example.com/msp
+    Policies:
+      Readers:
+        Type: Signature
+        Rule: "OR('ApproverMSP.admin', 'ApproverMSP.peer', 'ApproverMSP.client')"
+      Writers:
+        Type: Signature
+        Rule: "OR('ApproverMSP.admin', 'ApproverMSP.client')"
+      Admins:
+        Type: Signature
+        Rule: "OR('ApproverMSP.admin')"
+      Endorsement:
+        Type: Signature
+        Rule: "OR('ApproverMSP.peer')"
+
+Application: &ApplicationDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+    LifecycleEndorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+    Endorsement:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Endorsement"
+  Organizations:
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  EtcdRaft:
+    Consenters:
+      - Host: orderer.example.com
+        Port: 7050
+        ClientTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+        ServerTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+  Addresses:
+    - orderer.example.com:7050
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers:
+      Type: ImplicitMeta
+      Rule: "ANY Readers"
+    Writers:
+      Type: ImplicitMeta
+      Rule: "ANY Writers"
+    Admins:
+      Type: ImplicitMeta
+      Rule: "MAJORITY Admins"
+  Consortium: SampleConsortium
+
+Profiles:
+  TwoOrgsOrdererGenesis:
+    Orderer:
+      <<: *OrdererDefaults
+      Organizations:
+        - *OrdererOrg
+    Consortiums:
+      SampleConsortium:
+        Organizations:
+          - *CreatorOrg
+          - *ApproverOrg
+
+  TwoOrgsChannel:
+    Consortium: SampleConsortium
+    Application:
+      <<: *ApplicationDefaults
+      Organizations:
+        - *CreatorOrg
+        - *ApproverOrg
+

@@ -1,0 +1,21 @@
+security :
+Frontend Security (React):
+
+
+   1. Centralized API Requests with Token: modifying
+      go/src/github.com/135518004/fabric-samples/senior/frontend/src/utils/api.ts to include a mechanism for setting and
+      automatically attaching the JWT token to all outgoing requests.
+   2. Server-Side User/Role Verification: I will update
+      go/src/github.com/135518004/fabric-samples/senior/frontend/src/App.tsx to fetch the user's role and details from a
+      secure backend endpoint after login, rather than relying on localStorage for authorization decisions.
+
+  Backend Security (Go):
+
+
+   1. JWT Authentication Middleware: implement a new middleware in
+      go/src/github.com/135518004/fabric-samples/senior/application-gateway-go/api-server/main.go to validate JWT tokens for
+      protected routes.
+   2. Protected Routes: apply this middleware to all API endpoints that require authentication.
+   3. User Context: Handlers will be updated to retrieve the authenticated user's information from the request context,
+      ensuring that actions are performed on behalf of a verified user.
+

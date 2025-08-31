@@ -1,0 +1,76 @@
+### Phase 1: Bringing the Network Up (`./network.sh up`)
+
+This command starts the network infrastructure. Since you've migrated to Fabric CA, it involves starting the Certificate Authorities first, then the peers and orderers, and creating all the necessary cryptographic identities.
+
+1.  **`network.sh`**
+    *   **Purpose:** This is the main control script for your network. It parses your command (`up`), sets global variables, and calls other scripts and tools to execute the steps.
+    *   **How it Works:** When you run `./network.sh up`, it triggers the `networkUp()` function. This function checks for prerequisites (like Docker) and then begins starting the network components using Docker Compose.
+
+2.  **`compose/compose-test-net.yaml`** (and its base file `compose/docker/docker-compose-test-net.yaml`)
+    *   **Purpose:** This file is the blueprint for your network's Docker containers. It defines all the services (peers, orderers, CAs), their container images, ports, environment variables, and crucially, the volumes that link your configuration files on your local machine to the containers.
+    *   **How it's Used:** `network.sh` executes a `docker compose -f ... up -d` command, pointing to this file. Docker then reads it and starts all the defined containers in the background. This includes `ca_is`, `ca_cs`, `ca_orderer`, all your peers, and the orderer node.
+
+3.  **`organizations/fabric-ca-server-config.yaml`** (One for each CA: IS, CS, and Orderer)
+    *   **Purpose:** This is the configuration file for a Fabric CA server. When a CA container (e.g., `ca_is`) starts, it uses this file to configure itself.
+    *   **How it's Used:** The file specifies the CA's name, the signing certificate it should use, and defines user affiliations (e.g., `is.department1`). This is read by the `fabric-ca-server` process inside the container upon startup.
+
+4.  **`scripts/registerEnroll.sh`**
+    *   **Purpose:** After the CA containers are running, this script's job is to communicate with them to create identities for all your network participants.
+    *   **How it Works:** `network.sh` calls this script. It uses the `fabric-ca-client` tool to:
+        *   **Enroll** the bootstrap admin user for each organization (e.g., `admin-is`, `admin-cs`).
+        *   **Register** new identities for the peers and users of each organization, using the newly enrolled admin identity.
+        *   **Enroll** each peer and user to get their specific cryptographic material (MSPs).
+        *   It then organizes all the generated certificates and keys into the correct directory structure.
+
+5.  **`organizations/peerOrganizations/is.example.com/`** and **`organizations/peerOrganizations/cs.example.com/`**
+    *   **Purpose:** These directories are the result of the `registerEnroll.sh` script. They contain the formal identities (MSPs - Membership Service Providers) for each organization.
+    *   **How it's Used:** This is not a script, but a critical directory structure. It contains the CAs' root certificates, TLS certificates, and the specific MSPs for every peer and user. All future interactions with the network will use the certificates and keys within these folders to prove their identity.
+
+### Phase 2: Creating a Channel (`./network.sh createChannel`)
+
+This command creates a private ledger for your organizations to transact on.
+
+1.  **`network.sh`**
+    *   **Purpose:** It again acts as the entry point, calling the `createChannel()` function.
+    *   **How it Works:** This function sets some parameters (like channel name) and then calls the `createChannel.sh` script to do the heavy lifting.
+
+2.  **`scripts/createChannel.sh`**
+    *   **Purpose:** This script orchestrates the creation and joining of the channel.
+    *   **How it Works:**
+        *   First, it uses the `configtxgen` tool to create the channel creation transaction file.
+        *   Then, it exports the necessary environment variables to act as the first peer.
+        *   It executes the `peer channel create` command.
+        *   Finally, it iterates through all other peers in your organizations (`IS` and `CS`) and has each of them `peer channel join` the newly created channel.
+
+3.  **`configtx/configtx.yaml`**
+    *   **Purpose:** This is the configuration blueprint for your channels and the ordering service. It defines which organizations are members of the network (the "Consortium"), the rules for updating the channel ("Policies"), and the channel structure itself.
+    *   **How it's Used:** The `configtxgen` tool reads the `TwoOrgsApplicationGenesis` profile from this file to generate a channel creation transaction file (e.g., `mychannel.tx`). This file contains the initial configuration of your new channel.
+
+4.  **`scripts/envVar.sh`**
+    *   **Purpose:** This is a crucial utility script. Its sole purpose is to set the correct environment variables for a given organization and peer.
+    *   **How it's Used:** Before any `peer` command is run (like `peer channel join`), `createChannel.sh` will `source` this script (e.g., `source scripts/envVar.sh is 0`). This sets variables like `CORE_PEER_LOCALMSPID`, `CORE_PEER_ADDRESS`, and `CORE_PEER_MSPCONFIGPATH` so the `peer` command knows it is operating as `peer0.is.example.com` and can find its identity credentials. This is done repeatedly for every peer that joins the channel.
+
+### Phase 3: Deploying Chaincode (`./network.sh deployCC`)
+
+This command installs and starts a smart contract (chaincode) on your channel.
+
+1.  **`network.sh`**
+    *   **Purpose:** The entry point. The `deployCC()` function calls the main deployment script.
+    *   **How it Works:** It sets chaincode-specific variables (name, path, version) and then executes `deployCC.sh`.
+
+2.  **`scripts/deployCC.sh`**
+    *   **Purpose:** This script manages the entire chaincode lifecycle as defined by Fabric v2.x.
+    *   **How it Works:** It follows a multi-step process, running commands for each organization:
+        1.  **Package:** It packages the chaincode source code into a `.tar.gz` file.
+        2.  **Install:** It installs this package on the peers of both `IS` and `CS`.
+        3.  **Approve:** Each organization must approve a chaincode definition for the channel. This script submits the approval from both `IS` and `CS`.
+        4.  **Commit:** Once enough organizations have approved, one of them commits the chaincode definition to the channel, making it active.
+        5.  **Init:** It can optionally call the `Init` function in the chaincode.
+
+3.  **`scripts/ccutils.sh`**
+    *   **Purpose:** This file contains reusable helper functions that `deployCC.sh` calls to perform the lifecycle steps.
+    *   **How it's Used:** `deployCC.sh` calls functions within this script like `installChaincode`, `approveForMyOrg`, and `commitChaincodeDefinition`. This keeps the main script cleaner and abstracts the details of the `peer lifecycle chaincode` commands.
+
+4.  **`scripts/envVar.sh`**
+    *   **Purpose:** Just as in the channel creation phase, this script is used constantly.
+    *   **How it's Used:** `deployCC.sh` and `ccutils.sh` source this script before every single `peer lifecycle` command to switch the identity and target peer. For example, it will source it for `is 0` to install on the first peer, then for `cs 0` to install on the second org's peer, then again for `is` to approve, and for `cs` to approve, and so on. It is the key to making one script operate on behalf of the entire network.

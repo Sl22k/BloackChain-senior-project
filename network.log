@@ -1,0 +1,328 @@
+[0;34mUsing docker and docker-compose[0m
+[0;34mCreating channel 'mychannel'.[0m
+[0;34mIf network is not up, starting nodes with CLI timeout of '5' tries and CLI delay of '3' seconds and using database 'leveldb with crypto from 'Certificate Authorities'[0m
+[0;34mBringing up network[0m
+[0;34mLOCAL_VERSION=v2.5.13[0m
+[0;34mDOCKER_IMAGE_VERSION=v3.1.1[0m
+[1;33mLocal fabric binaries and docker images are out of sync. This may cause problems.[0m
+[0;34mCA_LOCAL_VERSION=v1.5.15[0m
+[0;34mCA_DOCKER_IMAGE_VERSION=v1.5.15[0m
+[0;34mGenerating certificates using Fabric CA[0m
+Creating network "fabric_test" with the default driver
+Creating ca_cs ... 
+Creating ca_orderer ... 
+Creating ca_is      ... 
+Creating ca_cs      ... done
+Creating ca_is      ... done
+Creating ca_orderer ... done
+[0;34mWaiting for CA servers to start...[0m
+[0;32mis CA is up.[0m
+[0;32mcs CA is up.[0m
+[0;32mordererOrg CA is up.[0m
+[0;34mCreating IS Identities[0m
+[0;34mEnrolling the CA admin[0m
++ fabric-ca-client enroll -u https://admin:adminpw@localhost:7054 --caname ca-is --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/is/ca-cert.pem
+2025/08/06 15:42:52 [INFO] Created a default configuration file at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/fabric-ca-client-config.yaml
+2025/08/06 15:42:52 [INFO] TLS Enabled
+2025/08/06 15:42:52 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:52 [INFO] encoded CSR
+2025/08/06 15:42:52 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/msp/signcerts/cert.pem
+2025/08/06 15:42:52 [INFO] Stored root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/msp/cacerts/localhost-7054-ca-is.pem
+2025/08/06 15:42:52 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/msp/IssuerPublicKey
+2025/08/06 15:42:52 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/msp/IssuerRevocationPublicKey
+[0;34mRegistering peer0[0m
++ fabric-ca-client register --caname ca-is --id.name peer0 --id.secret peer0pw --id.type peer --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/is/ca-cert.pem
+2025/08/06 15:42:52 [INFO] Configuration file location: /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/fabric-ca-client-config.yaml
+2025/08/06 15:42:52 [INFO] TLS Enabled
+2025/08/06 15:42:52 [INFO] TLS Enabled
+Password: peer0pw
+[0;34mRegistering peer1[0m
++ fabric-ca-client register --caname ca-is --id.name peer1 --id.secret peer1pw --id.type peer --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/is/ca-cert.pem
+2025/08/06 15:42:52 [INFO] Configuration file location: /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/fabric-ca-client-config.yaml
+2025/08/06 15:42:52 [INFO] TLS Enabled
+2025/08/06 15:42:52 [INFO] TLS Enabled
+Password: peer1pw
+[0;34mRegistering user[0m
++ fabric-ca-client register --caname ca-is --id.name user1 --id.secret user1pw --id.type client --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/is/ca-cert.pem
+2025/08/06 15:42:52 [INFO] Configuration file location: /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/fabric-ca-client-config.yaml
+2025/08/06 15:42:52 [INFO] TLS Enabled
+2025/08/06 15:42:52 [INFO] TLS Enabled
+Password: user1pw
+[0;34mRegistering the org admin[0m
++ fabric-ca-client register --caname ca-is --id.name isadmin --id.secret isadminpw --id.type admin --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/is/ca-cert.pem
+2025/08/06 15:42:53 [INFO] Configuration file location: /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/fabric-ca-client-config.yaml
+2025/08/06 15:42:53 [INFO] TLS Enabled
+2025/08/06 15:42:53 [INFO] TLS Enabled
+Password: isadminpw
+[0;34mGenerating the peer0 msp[0m
++ fabric-ca-client enroll -u https://peer0:peer0pw@localhost:7054 --caname ca-is -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer0.is.example.com/msp --csr.hosts peer0.is.example.com --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/is/ca-cert.pem
+2025/08/06 15:42:53 [INFO] TLS Enabled
+2025/08/06 15:42:53 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:53 [INFO] encoded CSR
+2025/08/06 15:42:53 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer0.is.example.com/msp/signcerts/cert.pem
+2025/08/06 15:42:53 [INFO] Stored root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer0.is.example.com/msp/cacerts/localhost-7054-ca-is.pem
+2025/08/06 15:42:53 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer0.is.example.com/msp/IssuerPublicKey
+2025/08/06 15:42:53 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer0.is.example.com/msp/IssuerRevocationPublicKey
+[0;34mGenerating the peer0-tls certificates[0m
++ fabric-ca-client enroll -u https://peer0:peer0pw@localhost:7054 --caname ca-is -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer0.is.example.com/tls --enrollment.profile tls --csr.hosts peer0.is.example.com --csr.hosts localhost --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/is/ca-cert.pem
+2025/08/06 15:42:53 [INFO] TLS Enabled
+2025/08/06 15:42:53 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:53 [INFO] encoded CSR
+2025/08/06 15:42:53 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer0.is.example.com/tls/signcerts/cert.pem
+2025/08/06 15:42:53 [INFO] Stored TLS root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer0.is.example.com/tls/tlscacerts/tls-localhost-7054-ca-is.pem
+2025/08/06 15:42:53 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer0.is.example.com/tls/IssuerPublicKey
+2025/08/06 15:42:53 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer0.is.example.com/tls/IssuerRevocationPublicKey
+[0;34mGenerating the peer1 msp[0m
++ fabric-ca-client enroll -u https://peer1:peer1pw@localhost:7054 --caname ca-is -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer1.is.example.com/msp --csr.hosts peer1.is.example.com --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/is/ca-cert.pem
+2025/08/06 15:42:53 [INFO] TLS Enabled
+2025/08/06 15:42:53 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:53 [INFO] encoded CSR
+2025/08/06 15:42:53 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer1.is.example.com/msp/signcerts/cert.pem
+2025/08/06 15:42:53 [INFO] Stored root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer1.is.example.com/msp/cacerts/localhost-7054-ca-is.pem
+2025/08/06 15:42:53 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer1.is.example.com/msp/IssuerPublicKey
+2025/08/06 15:42:53 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer1.is.example.com/msp/IssuerRevocationPublicKey
+[0;34mGenerating the peer1-tls certificates[0m
++ fabric-ca-client enroll -u https://peer1:peer1pw@localhost:7054 --caname ca-is -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer1.is.example.com/tls --enrollment.profile tls --csr.hosts peer1.is.example.com --csr.hosts localhost --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/is/ca-cert.pem
+2025/08/06 15:42:53 [INFO] TLS Enabled
+2025/08/06 15:42:53 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:53 [INFO] encoded CSR
+2025/08/06 15:42:53 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer1.is.example.com/tls/signcerts/cert.pem
+2025/08/06 15:42:53 [INFO] Stored TLS root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer1.is.example.com/tls/tlscacerts/tls-localhost-7054-ca-is.pem
+2025/08/06 15:42:53 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer1.is.example.com/tls/IssuerPublicKey
+2025/08/06 15:42:53 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/peers/peer1.is.example.com/tls/IssuerRevocationPublicKey
+[0;34mGenerating the user msp[0m
++ fabric-ca-client enroll -u https://user1:user1pw@localhost:7054 --caname ca-is -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/users/User1@is.example.com/msp --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/is/ca-cert.pem
+2025/08/06 15:42:54 [INFO] TLS Enabled
+2025/08/06 15:42:54 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:54 [INFO] encoded CSR
+2025/08/06 15:42:54 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/users/User1@is.example.com/msp/signcerts/cert.pem
+2025/08/06 15:42:54 [INFO] Stored root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/users/User1@is.example.com/msp/cacerts/localhost-7054-ca-is.pem
+2025/08/06 15:42:54 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/users/User1@is.example.com/msp/IssuerPublicKey
+2025/08/06 15:42:54 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/users/User1@is.example.com/msp/IssuerRevocationPublicKey
+[0;34mGenerating the org admin msp[0m
++ fabric-ca-client enroll -u https://isadmin:isadminpw@localhost:7054 --caname ca-is -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/users/Admin@is.example.com/msp --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/is/ca-cert.pem
+2025/08/06 15:42:54 [INFO] TLS Enabled
+2025/08/06 15:42:54 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:54 [INFO] encoded CSR
+2025/08/06 15:42:54 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/users/Admin@is.example.com/msp/signcerts/cert.pem
+2025/08/06 15:42:54 [INFO] Stored root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/users/Admin@is.example.com/msp/cacerts/localhost-7054-ca-is.pem
+2025/08/06 15:42:54 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/users/Admin@is.example.com/msp/IssuerPublicKey
+2025/08/06 15:42:54 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/is.example.com/users/Admin@is.example.com/msp/IssuerRevocationPublicKey
+[0;34mCreating CS Identities[0m
+[0;34mEnrolling the CA admin[0m
++ fabric-ca-client enroll -u https://admin:adminpw@localhost:8054 --caname ca-cs --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/cs/ca-cert.pem
+2025/08/06 15:42:54 [INFO] Created a default configuration file at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/fabric-ca-client-config.yaml
+2025/08/06 15:42:54 [INFO] TLS Enabled
+2025/08/06 15:42:54 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:54 [INFO] encoded CSR
+2025/08/06 15:42:54 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/msp/signcerts/cert.pem
+2025/08/06 15:42:54 [INFO] Stored root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/msp/cacerts/localhost-8054-ca-cs.pem
+2025/08/06 15:42:54 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/msp/IssuerPublicKey
+2025/08/06 15:42:54 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/msp/IssuerRevocationPublicKey
+[0;34mRegistering peer0[0m
++ fabric-ca-client register --caname ca-cs --id.name peer0 --id.secret peer0pw --id.type peer --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/cs/ca-cert.pem
+2025/08/06 15:42:54 [INFO] Configuration file location: /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/fabric-ca-client-config.yaml
+2025/08/06 15:42:54 [INFO] TLS Enabled
+2025/08/06 15:42:54 [INFO] TLS Enabled
+Password: peer0pw
+[0;34mRegistering peer1[0m
++ fabric-ca-client register --caname ca-cs --id.name peer1 --id.secret peer1pw --id.type peer --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/cs/ca-cert.pem
+2025/08/06 15:42:54 [INFO] Configuration file location: /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/fabric-ca-client-config.yaml
+2025/08/06 15:42:54 [INFO] TLS Enabled
+2025/08/06 15:42:54 [INFO] TLS Enabled
+Password: peer1pw
+[0;34mRegistering peer2[0m
++ fabric-ca-client register --caname ca-cs --id.name peer2 --id.secret peer2pw --id.type peer --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/cs/ca-cert.pem
+2025/08/06 15:42:54 [INFO] Configuration file location: /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/fabric-ca-client-config.yaml
+2025/08/06 15:42:54 [INFO] TLS Enabled
+2025/08/06 15:42:54 [INFO] TLS Enabled
+Password: peer2pw
+[0;34mRegistering user[0m
++ fabric-ca-client register --caname ca-cs --id.name user1 --id.secret user1pw --id.type client --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/cs/ca-cert.pem
+2025/08/06 15:42:55 [INFO] Configuration file location: /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/fabric-ca-client-config.yaml
+2025/08/06 15:42:55 [INFO] TLS Enabled
+2025/08/06 15:42:55 [INFO] TLS Enabled
+Password: user1pw
+[0;34mRegistering the org admin[0m
++ fabric-ca-client register --caname ca-cs --id.name csadmin --id.secret csadminpw --id.type admin --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/cs/ca-cert.pem
+2025/08/06 15:42:55 [INFO] Configuration file location: /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/fabric-ca-client-config.yaml
+2025/08/06 15:42:55 [INFO] TLS Enabled
+2025/08/06 15:42:55 [INFO] TLS Enabled
+Password: csadminpw
+[0;34mGenerating the peer0 msp[0m
++ fabric-ca-client enroll -u https://peer0:peer0pw@localhost:8054 --caname ca-cs -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer0.cs.example.com/msp --csr.hosts peer0.cs.example.com --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/cs/ca-cert.pem
+2025/08/06 15:42:55 [INFO] TLS Enabled
+2025/08/06 15:42:55 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:55 [INFO] encoded CSR
+2025/08/06 15:42:55 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer0.cs.example.com/msp/signcerts/cert.pem
+2025/08/06 15:42:55 [INFO] Stored root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer0.cs.example.com/msp/cacerts/localhost-8054-ca-cs.pem
+2025/08/06 15:42:55 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer0.cs.example.com/msp/IssuerPublicKey
+2025/08/06 15:42:55 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer0.cs.example.com/msp/IssuerRevocationPublicKey
+[0;34mGenerating the peer0-tls certificates[0m
++ fabric-ca-client enroll -u https://peer0:peer0pw@localhost:8054 --caname ca-cs -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer0.cs.example.com/tls --enrollment.profile tls --csr.hosts peer0.cs.example.com --csr.hosts localhost --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/cs/ca-cert.pem
+2025/08/06 15:42:55 [INFO] TLS Enabled
+2025/08/06 15:42:55 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:55 [INFO] encoded CSR
+2025/08/06 15:42:55 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer0.cs.example.com/tls/signcerts/cert.pem
+2025/08/06 15:42:55 [INFO] Stored TLS root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer0.cs.example.com/tls/tlscacerts/tls-localhost-8054-ca-cs.pem
+2025/08/06 15:42:55 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer0.cs.example.com/tls/IssuerPublicKey
+2025/08/06 15:42:55 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer0.cs.example.com/tls/IssuerRevocationPublicKey
+[0;34mGenerating the peer1 msp[0m
++ fabric-ca-client enroll -u https://peer1:peer1pw@localhost:8054 --caname ca-cs -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer1.cs.example.com/msp --csr.hosts peer1.cs.example.com --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/cs/ca-cert.pem
+2025/08/06 15:42:55 [INFO] TLS Enabled
+2025/08/06 15:42:55 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:55 [INFO] encoded CSR
+2025/08/06 15:42:56 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer1.cs.example.com/msp/signcerts/cert.pem
+2025/08/06 15:42:56 [INFO] Stored root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer1.cs.example.com/msp/cacerts/localhost-8054-ca-cs.pem
+2025/08/06 15:42:56 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer1.cs.example.com/msp/IssuerPublicKey
+2025/08/06 15:42:56 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer1.cs.example.com/msp/IssuerRevocationPublicKey
+[0;34mGenerating the peer1-tls certificates[0m
++ fabric-ca-client enroll -u https://peer1:peer1pw@localhost:8054 --caname ca-cs -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer1.cs.example.com/tls --enrollment.profile tls --csr.hosts peer1.cs.example.com --csr.hosts localhost --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/cs/ca-cert.pem
+2025/08/06 15:42:56 [INFO] TLS Enabled
+2025/08/06 15:42:56 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:56 [INFO] encoded CSR
+2025/08/06 15:42:56 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer1.cs.example.com/tls/signcerts/cert.pem
+2025/08/06 15:42:56 [INFO] Stored TLS root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer1.cs.example.com/tls/tlscacerts/tls-localhost-8054-ca-cs.pem
+2025/08/06 15:42:56 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer1.cs.example.com/tls/IssuerPublicKey
+2025/08/06 15:42:56 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer1.cs.example.com/tls/IssuerRevocationPublicKey
+[0;34mGenerating the peer2 msp[0m
++ fabric-ca-client enroll -u https://peer2:peer2pw@localhost:8054 --caname ca-cs -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer2.cs.example.com/msp --csr.hosts peer2.cs.example.com --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/cs/ca-cert.pem
+2025/08/06 15:42:56 [INFO] TLS Enabled
+2025/08/06 15:42:56 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:56 [INFO] encoded CSR
+2025/08/06 15:42:56 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer2.cs.example.com/msp/signcerts/cert.pem
+2025/08/06 15:42:56 [INFO] Stored root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer2.cs.example.com/msp/cacerts/localhost-8054-ca-cs.pem
+2025/08/06 15:42:56 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer2.cs.example.com/msp/IssuerPublicKey
+2025/08/06 15:42:56 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer2.cs.example.com/msp/IssuerRevocationPublicKey
+[0;34mGenerating the peer2-tls certificates[0m
++ fabric-ca-client enroll -u https://peer2:peer2pw@localhost:8054 --caname ca-cs -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer2.cs.example.com/tls --enrollment.profile tls --csr.hosts peer2.cs.example.com --csr.hosts localhost --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/cs/ca-cert.pem
+2025/08/06 15:42:56 [INFO] TLS Enabled
+2025/08/06 15:42:56 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:56 [INFO] encoded CSR
+2025/08/06 15:42:56 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer2.cs.example.com/tls/signcerts/cert.pem
+2025/08/06 15:42:56 [INFO] Stored TLS root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer2.cs.example.com/tls/tlscacerts/tls-localhost-8054-ca-cs.pem
+2025/08/06 15:42:56 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer2.cs.example.com/tls/IssuerPublicKey
+2025/08/06 15:42:56 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/peers/peer2.cs.example.com/tls/IssuerRevocationPublicKey
+[0;34mGenerating the user msp[0m
++ fabric-ca-client enroll -u https://user1:user1pw@localhost:8054 --caname ca-cs -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/users/User1@cs.example.com/msp --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/cs/ca-cert.pem
+2025/08/06 15:42:56 [INFO] TLS Enabled
+2025/08/06 15:42:56 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:56 [INFO] encoded CSR
+2025/08/06 15:42:56 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/users/User1@cs.example.com/msp/signcerts/cert.pem
+2025/08/06 15:42:56 [INFO] Stored root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/users/User1@cs.example.com/msp/cacerts/localhost-8054-ca-cs.pem
+2025/08/06 15:42:56 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/users/User1@cs.example.com/msp/IssuerPublicKey
+2025/08/06 15:42:56 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/users/User1@cs.example.com/msp/IssuerRevocationPublicKey
+[0;34mGenerating the org admin msp[0m
++ fabric-ca-client enroll -u https://csadmin:csadminpw@localhost:8054 --caname ca-cs -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/users/Admin@cs.example.com/msp --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/cs/ca-cert.pem
+2025/08/06 15:42:56 [INFO] TLS Enabled
+2025/08/06 15:42:56 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:56 [INFO] encoded CSR
+2025/08/06 15:42:56 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/users/Admin@cs.example.com/msp/signcerts/cert.pem
+2025/08/06 15:42:56 [INFO] Stored root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/users/Admin@cs.example.com/msp/cacerts/localhost-8054-ca-cs.pem
+2025/08/06 15:42:56 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/users/Admin@cs.example.com/msp/IssuerPublicKey
+2025/08/06 15:42:56 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/peerOrganizations/cs.example.com/users/Admin@cs.example.com/msp/IssuerRevocationPublicKey
+[0;34mCreating Orderer Org Identities[0m
+[0;34mEnrolling the CA admin[0m
++ fabric-ca-client enroll -u https://admin:adminpw@localhost:9054 --caname ca-orderer --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/ordererOrg/ca-cert.pem
+2025/08/06 15:42:57 [INFO] Created a default configuration file at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/fabric-ca-client-config.yaml
+2025/08/06 15:42:57 [INFO] TLS Enabled
+2025/08/06 15:42:57 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:57 [INFO] encoded CSR
+2025/08/06 15:42:57 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/msp/signcerts/cert.pem
+2025/08/06 15:42:57 [INFO] Stored root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/msp/cacerts/localhost-9054-ca-orderer.pem
+2025/08/06 15:42:57 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/msp/IssuerPublicKey
+2025/08/06 15:42:57 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/msp/IssuerRevocationPublicKey
+[0;34mRegistering orderer[0m
++ fabric-ca-client register --caname ca-orderer --id.name orderer --id.secret ordererpw --id.type orderer --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/ordererOrg/ca-cert.pem
+2025/08/06 15:42:57 [INFO] Configuration file location: /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/fabric-ca-client-config.yaml
+2025/08/06 15:42:57 [INFO] TLS Enabled
+2025/08/06 15:42:57 [INFO] TLS Enabled
+Password: ordererpw
+[0;34mRegistering the orderer admin[0m
++ fabric-ca-client register --caname ca-orderer --id.name ordererAdmin --id.secret ordererAdminpw --id.type admin --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/ordererOrg/ca-cert.pem
+2025/08/06 15:42:57 [INFO] Configuration file location: /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/fabric-ca-client-config.yaml
+2025/08/06 15:42:57 [INFO] TLS Enabled
+2025/08/06 15:42:57 [INFO] TLS Enabled
+Password: ordererAdminpw
+[0;34mGenerating the orderer msp[0m
++ fabric-ca-client enroll -u https://orderer:ordererpw@localhost:9054 --caname ca-orderer -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp --csr.hosts orderer.example.com --csr.hosts localhost --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/ordererOrg/ca-cert.pem
+2025/08/06 15:42:57 [INFO] TLS Enabled
+2025/08/06 15:42:57 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:57 [INFO] encoded CSR
+2025/08/06 15:42:57 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/signcerts/cert.pem
+2025/08/06 15:42:57 [INFO] Stored root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/cacerts/localhost-9054-ca-orderer.pem
+2025/08/06 15:42:57 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/IssuerPublicKey
+2025/08/06 15:42:57 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/msp/IssuerRevocationPublicKey
+[0;34mGenerating the orderer-tls certificates[0m
++ fabric-ca-client enroll -u https://orderer:ordererpw@localhost:9054 --caname ca-orderer -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls --enrollment.profile tls --csr.hosts orderer.example.com --csr.hosts localhost --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/ordererOrg/ca-cert.pem
+2025/08/06 15:42:57 [INFO] TLS Enabled
+2025/08/06 15:42:57 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:57 [INFO] encoded CSR
+2025/08/06 15:42:57 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/signcerts/cert.pem
+2025/08/06 15:42:57 [INFO] Stored TLS root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/tlscacerts/tls-localhost-9054-ca-orderer.pem
+2025/08/06 15:42:57 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/IssuerPublicKey
+2025/08/06 15:42:57 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/IssuerRevocationPublicKey
+[0;34mGenerating the admin msp[0m
++ fabric-ca-client enroll -u https://ordererAdmin:ordererAdminpw@localhost:9054 --caname ca-orderer -M /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/users/Admin@example.com/msp --tls.certfiles /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/fabric-ca/ordererOrg/ca-cert.pem
+2025/08/06 15:42:57 [INFO] TLS Enabled
+2025/08/06 15:42:57 [INFO] generating key: &{A:ecdsa S:256}
+2025/08/06 15:42:57 [INFO] encoded CSR
+2025/08/06 15:42:58 [INFO] Stored client certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/users/Admin@example.com/msp/signcerts/cert.pem
+2025/08/06 15:42:58 [INFO] Stored root CA certificate at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/users/Admin@example.com/msp/cacerts/localhost-9054-ca-orderer.pem
+2025/08/06 15:42:58 [INFO] Stored Issuer public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/users/Admin@example.com/msp/IssuerPublicKey
+2025/08/06 15:42:58 [INFO] Stored Issuer revocation public key at /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/users/Admin@example.com/msp/IssuerRevocationPublicKey
+[0;34mGenerating CCP files for Org1 and Org2[0m
+Creating network "fabric_document_approval" with the default driver
+Creating volume "net_orderer.example.com" with default driver
+Creating volume "net_peer0.is.example.com" with default driver
+Creating volume "net_peer1.is.example.com" with default driver
+Creating volume "net_peer0.cs.example.com" with default driver
+Creating volume "net_peer1.cs.example.com" with default driver
+Creating volume "net_peer2.cs.example.com" with default driver
+Volume postgres_data declared as external, but could not be found. Please create the volume manually using `docker volume create --name=postgres_data` and try again.
+CONTAINER ID   IMAGE                          COMMAND                  CREATED         STATUS         PORTS                                                                                                    NAMES
+2f2895d429aa   hyperledger/fabric-ca:latest   "sh -c 'fabric-ca-se…"   8 seconds ago   Up 8 seconds   0.0.0.0:7054->7054/tcp, [::]:7054->7054/tcp, 0.0.0.0:17054->17054/tcp, [::]:17054->17054/tcp             ca_is
+b7ea4a19a93f   hyperledger/fabric-ca:latest   "sh -c 'fabric-ca-se…"   8 seconds ago   Up 8 seconds   0.0.0.0:9054->9054/tcp, [::]:9054->9054/tcp, 7054/tcp, 0.0.0.0:19054->19054/tcp, [::]:19054->19054/tcp   ca_orderer
+b2083bd07565   hyperledger/fabric-ca:latest   "sh -c 'fabric-ca-se…"   8 seconds ago   Up 8 seconds   0.0.0.0:8054->8054/tcp, [::]:8054->8054/tcp, 7054/tcp, 0.0.0.0:18054->18054/tcp, [::]:18054->18054/tcp   ca_cs
+[0;34mUsing docker and docker-compose[0m
+[0;34mGenerating channel genesis block 'mychannel.block'[0m
+[0;34mUsing organization is and peer 0[0m
+/home/salman/go/src/github.com/135518004/fabric-samples/network/../bin/configtxgen
++ '[' 0 -eq 1 ']'
++ configtxgen -profile ChannelUsingRaft -outputBlock ./channel-artifacts/mychannel.block -channelID mychannel
+[34m2025-08-06 15:42:58.904 +03 0001 INFO[0m [common.tools.configtxgen] [34;1mmain[0m -> Loading configuration
+[34m2025-08-06 15:42:58.909 +03 0002 INFO[0m [common.tools.configtxgen.localconfig] [34;1mcompleteInitialization[0m -> orderer type: etcdraft
+[34m2025-08-06 15:42:58.909 +03 0003 INFO[0m [common.tools.configtxgen.localconfig] [34;1mcompleteInitialization[0m -> Orderer.EtcdRaft.Options unset, setting to tick_interval:"500ms" election_tick:10 heartbeat_tick:1 max_inflight_blocks:5 snapshot_interval_size:16777216 
+[34m2025-08-06 15:42:58.909 +03 0004 INFO[0m [common.tools.configtxgen.localconfig] [34;1mLoad[0m -> Loaded configuration: /home/salman/go/src/github.com/135518004/fabric-samples/network/configtx/configtx.yaml
+[34m2025-08-06 15:42:58.911 +03 0005 INFO[0m [common.tools.configtxgen] [34;1mdoOutputBlock[0m -> Generating genesis block
+[34m2025-08-06 15:42:58.911 +03 0006 INFO[0m [common.tools.configtxgen] [34;1mdoOutputBlock[0m -> Creating application channel genesis block
+[34m2025-08-06 15:42:58.912 +03 0007 INFO[0m [common.tools.configtxgen] [34;1mdoOutputBlock[0m -> Writing genesis block
++ res=0
+[0;34mCreating channel mychannel[0m
+[0;34mAdding orderers[0m
++ . scripts/orderer.sh mychannel
+++ channel_name=mychannel
+++ export PATH=/../bin:/home/salman/go/src/github.com/135518004/fabric-samples/network/../bin:/home/salman/go/src/github.com/135518004/fabric-samples/network/../bin:/home/salman/go/src/github.com/135518004/fabric-samples/network/../bin:/home/salman/.nvm/versions/node/v20.19.0/bin:/home/salman/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin
+++ PATH=/../bin:/home/salman/go/src/github.com/135518004/fabric-samples/network/../bin:/home/salman/go/src/github.com/135518004/fabric-samples/network/../bin:/home/salman/go/src/github.com/135518004/fabric-samples/network/../bin:/home/salman/.nvm/versions/node/v20.19.0/bin:/home/salman/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin
+++ export ORDERER_ADMIN_TLS_SIGN_CERT=/home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+++ ORDERER_ADMIN_TLS_SIGN_CERT=/home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt
+++ export ORDERER_ADMIN_TLS_PRIVATE_KEY=/home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.key
+++ ORDERER_ADMIN_TLS_PRIVATE_KEY=/home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.key
+++ osnadmin channel join --channelID mychannel --config-block ./channel-artifacts/mychannel.block -o localhost:7053 --ca-file /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem --client-cert /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.crt --client-key /home/salman/go/src/github.com/135518004/fabric-samples/network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/server.key
++ '[' 0 -eq 1 ']'
++ res=0
+Error: Post "https://localhost:7053/participation/v1/channels": dial tcp 127.0.0.1:7053: connect: connection refused
+
+[0;32mChannel 'mychannel' created[0m
+[0;34mJoining is peers to the channel...[0m
+[0;34mUsing organization is and peer 0[0m
++ peer channel join -b ./channel-artifacts/mychannel.block
++ res=1
++ peer channel join -b ./channel-artifacts/mychannel.block
++ res=1
++ peer channel join -b ./channel-artifacts/mychannel.block
++ res=1
++ peer channel join -b ./channel-artifacts/mychannel.block
++ res=1
+Error: error getting endorser client for channel: endorser client failed to connect to localhost:7051: failed to create new connection: connection error: desc = "transport: error while dialing: dial tcp 127.0.0.1:7051: connect: connection refused"
+[0;31mAfter 5 attempts, peer0.org has failed to join channel 'mychannel' [0m

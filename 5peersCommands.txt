@@ -1,0 +1,84 @@
+# 1. Network and Chaincode Setup
+
+# IMPORTANT: Run these commands from the root of the 'my-fabric-project' directory
+cd network/
+
+# Bring down any existing network
+./network.sh down
+
+# Bring up the network with a channel named 'mychannel' and Certificate Authorities , and run the postpres database
+./network.sh up createChannel -ca -c mychannel -p
+
+# Deploy the chaincode
+# Note: This command is run from the 'network' directory
+export GOWORK=off && ./network.sh deployCC -ccn documentApproval -ccp ../senior/chaincode-go/ -ccl go -cci InitLedger
+
+./network.sh deployCC -ccn documentApproval -ccp ../senior/chaincode-go/ -ccl go
+./network.sh deployCC -ccn documentApproval -ccp ../senior/chaincode-go/ -ccl go -ccv 1.1 -ccs 2
+
+
+
+
+# 2. Peer CLI Environment Setup
+
+# Set environment variables for IS Organization - Peer 0
+# To use, copy and paste these lines into your terminal (while in the 'network' directory):
+export PATH=${PWD}/../bin:$PATH
+export FABRIC_CFG_PATH=${PWD}/../config/
+export CORE_PEER_LOCALMSPID=ISMSP
+export CORE_PEER_TLS_ENABLED=true
+export CORE_PEER_TLS_ROOTCERT_FILE=${PWD}/organizations/peerOrganizations/is.example.com/tlsca/tlsca.is.example.com-cert.pem
+export CORE_PEER_MSPCONFIGPATH=${PWD}/organizations/peerOrganizations/is.example.com/users/Admin@is.example.com/msp
+export CORE_PEER_ADDRESS=localhost:7051
+
+
+# 3. Peer CLI Chaincode Commands (for direct testing)
+
+# InitLedger: Seeds the ledger with initial data
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile "${PWD}/organizations/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem" --channelID mychannel --name documentApproval --peerAddresses localhost:7051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/is.example.com/tlsca/tlsca.is.example.com-cert.pem" --peerAddresses localhost:8051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/is.example.com/tlsca/tlsca.is.example.com-cert.pem" --peerAddresses localhost:9051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/cs.example.com/tlsca/tlsca.cs.example.com-cert.pem" --peerAddresses localhost:10051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/cs.example.com/tlsca/tlsca.cs.example.com-cert.pem" --peerAddresses localhost:11051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/cs.example.com/tlsca/tlsca.cs.example.com-cert.pem"  -c '{"function":"InitLedger","Args":[]}'
+
+# SubmitDocument: Submits a new document for approval
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile "${PWD}/organizations/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem" -C mychannel -n documentApproval --peerAddresses localhost:7051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/is.example.com/tlsca/tlsca.is.example.com-cert.pem" --peerAddresses localhost:8051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/is.example.com/tlsca/tlsca.is.example.com-cert.pem" --peerAddresses localhost:9051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/cs.example.com/tlsca/tlsca.cs.example.com-cert.pem" --peerAddresses localhost:10051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/cs.example.com/tlsca/tlsca.cs.example.com-cert.pem" --peerAddresses localhost:11051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/cs.example.com/tlsca/tlsca.cs.example.com-cert.pem" -c '{"function":"SubmitDocument","Args":["doc3", "hash_new_456", "yousif@uni.edu", "[\"profA@uni.edu\",\"profD@uni.edu\"]"]}'
+
+
+# ApproveDocument: Approves a document (the decision part)
+peer chaincode invoke -o localhost:7050 --ordererTLSHostnameOverride orderer.example.com --tls --cafile "${PWD}/organizations/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem" -C mychannel -n documentApproval --peerAddresses localhost:7051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/is.example.com/tlsca/tlsca.is.example.com-cert.pem" --peerAddresses localhost:8051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/is.example.com/tlsca/tlsca.is.example.com-cert.pem" --peerAddresses localhost:9051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/cs.example.com/tlsca/tlsca.cs.example.com-cert.pem" --peerAddresses localhost:10051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/cs.example.com/tlsca/tlsca.cs.example.com-cert.pem" --peerAddresses localhost:11051 --tlsRootCertFiles "${PWD}/organizations/peerOrganizations/cs.example.com/tlsca/tlsca.cs.example.com-cert.pem" -c '{"function":"ApproveDocument","Args":["doc3", "profA@uni.edu", "APPROVE"]}'
+
+# QueryDocumentStatus: Gets the current status of a document
+peer chaincode query -C mychannel -n documentApproval -c '{"Args":["QueryDocumentStatus","doc3"]}'
+
+# GetAllDocuments: Queries all documents on the ledger
+peer chaincode query -C mychannel -n documentApproval -c '{"Args":["GetAllDocuments"]}'
+
+
+# 4. Go Gateway Application Commands
+
+# IMPORTANT: Run these commands from the root of the 'my-fabric-project' directory
+cd ../document-approval/application-gateway-go
+
+# Submit a document via the gateway
+go run main.go -action=submit -id=doc4 -hash=gateway_hash_789 -approvers="profB@uni.edu,profC@uni.edu"
+
+# Make a decision on a document via the gateway
+go run main.go -action=decide -id=doc4 -approver=profB@uni.edu -decision=REJECT
+
+# Get document status via the gateway
+go run main.go -action=status -id=doc4
+
+# Get all documents via the gateway
+go run main.go -action=all
+
+
+# to delete all docker volume
+docker volume rm $(docker volume ls -q)
+
+docker volume ls -q | grep -v net_postgres_data
+
+
+
+node scraping-server.js
+
+export JWT_SECRET="your-secret-key-here"
+
+peer lifecycle chaincode querycommitted --channelID mychannel --name documentApproval
+

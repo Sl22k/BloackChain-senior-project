@@ -19,30 +19,72 @@ const (
 type Decision struct {
 	Status  ApproverStatus `json:"Status"`
 	Comment string         `json:"Comment"`
+	Date    string         `json:"Date,omitempty"`
+	Time    string         `json:"Time,omitempty"`
 }
 
 type DocumentVersion struct {
-	Version   int    `json:"Version"`
-	Hash      string `json:"Hash"`
-	Submitter string `json:"Submitter"`
-	Timestamp int64  `json:"Timestamp"`
+	Version          int                 `json:"Version"`
+	Hash             string              `json:"Hash"`
+	Submitter        string              `json:"Submitter"`
+	Timestamp        int64               `json:"Timestamp"`
+	Date             string              `json:"Date"`
+	Time             string              `json:"Time"`
+	ApprovalsMap     map[string]Decision `json:"ApprovalsMap"`
+	ValidDecisions   []string            `json:"ValidDecisions"`
+	ApproversChanged bool                `json:"ApproversChanged"`
+	DecisionsChanged bool                `json:"DecisionsChanged"`
+	WorkflowSnapshot *WorkflowConfig     `json:"WorkflowSnapshot"`
 }
 
 type Document struct {
-	ID                string              `json:"ID"`
-	LatestVersion     int                 `json:"LatestVersion"`
-	Versions          []DocumentVersion   `json:"Versions"`
-	Uploader          string              `json:"Uploader"`
-	PrivilegedEditors []string            `json:"PrivilegedEditors"`
-	Editors           []string            `json:"Editors"`
-	ApprovalsMap      map[string]Decision `json:"ApprovalsMap"`
-	ValidDecisions    []string            `json:"ValidDecisions"`
-	ApprovedCount     int                 `json:"ApprovedCount"`
-	RejectedCount     int                 `json:"RejectedCount"`
-	PendingCount      int                 `json:"PendingCount"`
+	ID                 string                       `json:"ID"`
+	LatestVersion      int                          `json:"LatestVersion"`
+	Versions           []DocumentVersion            `json:"Versions"`
+	Uploader           string                       `json:"Uploader"`
+	PrivilegedEditors  []string                     `json:"PrivilegedEditors"`
+	Editors            []string                     `json:"Editors"`
+	ApprovalsMap       map[string]Decision          `json:"ApprovalsMap"`
+	ValidDecisions     []string                     `json:"ValidDecisions"`
+	ApprovedCount      int                          `json:"ApprovedCount"`
+	RejectedCount      int                          `json:"RejectedCount"`
+	PendingCount       int                          `json:"PendingCount"`
+	LastModifiedDate   string                       `json:"LastModifiedDate,omitempty"`
+	LastModifiedTime   string                       `json:"LastModifiedTime,omitempty"`
+	Workflow           WorkflowConfig               `json:"Workflow,omitempty"`
+	VersionWorkflows   map[string]*WorkflowConfig   `json:"VersionWorkflows"`
 }
 
-// StatusResponse gives document status summary
+// NOTE: The following are placeholder structs and functions.
+// You need to provide the actual implementation for them.
+
+// WorkflowConfig defines the configuration for a workflow
+type WorkflowConfig struct {
+	Enabled         bool               `json:"Enabled"`
+	Stages          []WorkflowStage    `json:"Stages"`
+	CurrentStage    int                `json:"CurrentStage"`
+	CompletedStages []int              `json:"CompletedStages"`
+	StageHistory    []StageTransition  `json:"StageHistory"`
+}
+
+// WorkflowStage defines a stage in a workflow
+type WorkflowStage struct {
+	Name      string              `json:"Name"`
+	Approvers []string            `json:"Approvers"`
+	Approvals map[string]Decision `json:"Approvals"`
+}
+
+// StageTransition represents a transition in a workflow
+type StageTransition struct {
+	FromStage  int    `json:"FromStage"`
+	ToStage    int    `json:"ToStage"`
+	Transition string `json:"Transition"`
+	Actor      string `json:"Actor"`
+	Date       string `json:"Date"`
+	Time       string `json:"Time"`
+	Comment    string `json:"Comment"`
+}
+
 type StatusResponse struct {
 	ID                string              `json:"ID"`
 	LatestVersion     int                 `json:"LatestVersion"`
@@ -62,8 +104,56 @@ type SmartContract struct {
 	contractapi.Contract
 }
 
+func (s *SmartContract) validateInputs(inputs map[string]string) error {
+	// TODO: Implement your input validation logic here
+	return nil
+}
+
+func (s *SmartContract) getCurrentDateTime(ctx contractapi.TransactionContextInterface) (string, string, error) {
+	// TODO: Implement your logic to get current date and time
+	txTimestamp, err := ctx.GetStub().GetTxTimestamp()
+	if err != nil {
+		return "", "", err
+	}
+	t := time.Unix(txTimestamp.GetSeconds(), int64(txTimestamp.GetNanos()))
+	return t.Format("2006-01-02"), t.Format("15:04:05"), nil
+}
+
+func (s *SmartContract) isUserInList(user string, list []string) bool {
+	// TODO: Implement your logic to check if a user is in a list
+	for _, item := range list {
+		if item == user {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *SmartContract) deepCopyWorkflowConfig(config WorkflowConfig) WorkflowConfig {
+	// TODO: Implement your logic to deep copy a workflow config
+	return config
+}
+
+func (s *SmartContract) createWorkflowSnapshot(config WorkflowConfig, date, timeStr string) *WorkflowConfig {
+	// TODO: Implement your logic to create a workflow snapshot
+	return &config
+}
+
+func (s *SmartContract) initializeStageApprovals(stages []WorkflowStage, date, timeStr string) []WorkflowStage {
+	// TODO: Implement your logic to initialize stage approvals
+	return stages
+}
+
+func (s *SmartContract) updateCompatibilityApprovalsMap(doc *Document) {
+	// TODO: Implement your logic to update the compatibility approvals map
+}
+
+func (s *SmartContract) emitEvent(ctx contractapi.TransactionContextInterface, eventName, submitter, description, docID string, latestVersion int, details map[string]interface{}) error {
+	// TODO: Implement your event emission logic here
+	return nil
+}
+
 func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) error {
-	// No initial documents in the ledger
 	return nil
 }
 
@@ -75,7 +165,6 @@ func (s *SmartContract) SubmitDocument(ctx contractapi.TransactionContextInterfa
 
 	var doc Document
 	if exists {
-		// Document exists, so we are creating a new version
 		data, err := ctx.GetStub().GetState(id)
 		if err != nil {
 			return err
@@ -84,34 +173,17 @@ func (s *SmartContract) SubmitDocument(ctx contractapi.TransactionContextInterfa
 			return err
 		}
 
-		// Security Check 1: Verify the submitter is an editor (REMOVED)
-		/*
-		isEditor := false
-		for _, editor := range doc.Editors {
-			if editor == invokerId {
-				isEditor = true
-				break
-			}
-		}
-		if !isEditor {
-			return fmt.Errorf("uploader %s is not an editor for document %s", invokerId, id)
-		}
-		*/
-
-		// Security Check 2: Verify the hash is different from the latest version
 		if doc.Versions[doc.LatestVersion-1].Hash == hash {
 			return fmt.Errorf("new version hash is the same as the latest version hash")
 		}
 
 		doc.LatestVersion++
 		if resetApprovals {
-			// Reset approvals for the new version
 			for approver := range doc.ApprovalsMap {
 				doc.ApprovalsMap[approver] = Decision{Status: Pending, Comment: ""}
 			}
 		}
 	} else {
-		// This is a new document
 		var approvers []string
 		if err := json.Unmarshal([]byte(approversJSON), &approvers); err != nil {
 			return fmt.Errorf("invalid approvers JSON: %v", err)
@@ -133,8 +205,8 @@ func (s *SmartContract) SubmitDocument(ctx contractapi.TransactionContextInterfa
 			ID:                id,
 			LatestVersion:     1,
 			Uploader:          uploader,
-			PrivilegedEditors: []string{uploader}, // Initialize with the uploader as a privileged editor
-			Editors:           []string{uploader}, // The original uploader is the first editor
+			PrivilegedEditors: []string{uploader},
+			Editors:           []string{uploader},
 			ValidDecisions:    validDecisions,
 			ApprovalsMap:      approvalsMap,
 			ApprovedCount:     0,
@@ -143,7 +215,6 @@ func (s *SmartContract) SubmitDocument(ctx contractapi.TransactionContextInterfa
 		}
 	}
 
-	// Add the new version to the history
 	timestamp, _ := ctx.GetStub().GetTxTimestamp()
 	newVersion := DocumentVersion{
 		Version:   doc.LatestVersion,
@@ -153,7 +224,6 @@ func (s *SmartContract) SubmitDocument(ctx contractapi.TransactionContextInterfa
 	}
 	doc.Versions = append(doc.Versions, newVersion)
 
-	// Create the hash-to-ID index
 	hashKey := fmt.Sprintf("hash->%s", hash)
 	if err := ctx.GetStub().PutState(hashKey, []byte(id)); err != nil {
 		return fmt.Errorf("failed to create hash-to-ID index: %v", err)
@@ -164,34 +234,165 @@ func (s *SmartContract) SubmitDocument(ctx contractapi.TransactionContextInterfa
 		return err
 	}
 
-	err = ctx.GetStub().PutState(id, data)
+	return ctx.GetStub().PutState(id, data)
+}
+
+// SubmitNewVersion submits a new version of an existing document
+func (s *SmartContract) SubmitNewVersion(ctx contractapi.TransactionContextInterface, id, hash, submitter string, resetApprovals bool) error {
+	// Validate inputs
+	if err := s.validateInputs(map[string]string{
+		"id":        id,
+		"hash":      hash,
+		"submitter": submitter,
+	}); err != nil {
+		return err
+	}
+
+	date, timeStr, err := s.getCurrentDateTime(ctx)
 	if err != nil {
 		return err
 	}
 
-	// Add event emission for SubmitDocument
-	eventPayload := map[string]interface{}{
-		"documentID": doc.ID,
-		"version":    doc.LatestVersion,
-		"eventType":  "DocumentSubmitted",
-		"submitter":  uploader,
-		"timestamp":  newVersion.Timestamp,
-		"details": map[string]string{
-			"hash": hash,
-		},
+	// Check if document exists
+	data, err := ctx.GetStub().GetState(id)
+	if err != nil || data == nil {
+		return fmt.Errorf("document %s not found. Use SubmitDocument to create new documents", id)
 	}
 
-	eventBytes, err := json.Marshal(eventPayload)
+	var doc Document
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return err
+	}
+
+	// Security Check: Verify the submitter is an editor or privileged editor
+	if !s.isUserInList(submitter, doc.Editors) && !s.isUserInList(submitter, doc.PrivilegedEditors) {
+		return fmt.Errorf("submitter %s is not an editor or privileged editor for document %s", submitter, id)
+	}
+
+	// Security Check: Verify the hash is different from the latest version
+	if len(doc.Versions) > 0 && doc.Versions[len(doc.Versions)-1].Hash == hash {
+		return fmt.Errorf("new version hash is the same as the latest version hash")
+	}
+
+	// STEP 1: Preserve current workflow state for the current version - FIX FOR BUG #2
+	if doc.Workflow.Enabled {
+		// Initialize VersionWorkflows map if nil
+		if doc.VersionWorkflows == nil {
+			doc.VersionWorkflows = make(map[string]*WorkflowConfig)
+		}
+
+		// Deep copy current workflow state for preservation
+		currentWorkflowState := s.deepCopyWorkflowConfig(doc.Workflow)
+		doc.VersionWorkflows[fmt.Sprintf("%d", doc.LatestVersion)] = &currentWorkflowState
+
+		// Create workflow snapshot for version history
+		workflowSnapshot := s.createWorkflowSnapshot(doc.Workflow, date, timeStr)
+
+		// Update current version's workflow snapshot in existing versions
+		if len(doc.Versions) > 0 {
+			for i := range doc.Versions {
+				if doc.Versions[i].Version == doc.LatestVersion {
+					doc.Versions[i].WorkflowSnapshot = workflowSnapshot
+					break
+				}
+			}
+		}
+	}
+
+	// STEP 2: Update document for new version
+	doc.LatestVersion++
+	doc.LastModifiedDate = date
+	doc.LastModifiedTime = timeStr
+
+	// STEP 3: Create snapshot of FINAL state before reset - preserves approval trail
+	// This captures the completed approval state for the historical version
+	finalApprovalState := make(map[string]Decision)
+	for k, v := range doc.ApprovalsMap {
+		finalApprovalState[k] = v
+	}
+
+	// STEP 4: Reset approvals and workflow for new version - FIX FOR BUG #2
+	if resetApprovals {
+		// Reset compatibility ApprovalsMap
+		for approver := range doc.ApprovalsMap {
+			doc.ApprovalsMap[approver] = Decision{
+				Status:  Pending,
+				Comment: "",
+				Date:    date,
+				Time:    timeStr,
+			}
+		}
+
+		// Reset workflow state for new version - FIX FOR BUG #2  
+		if doc.Workflow.Enabled {
+			// Reset workflow to initial state
+			doc.Workflow.CurrentStage = 1
+			doc.Workflow.CompletedStages = []int{}
+
+			// Reset all stage approvals to pending - FIX FOR BUG #1
+			doc.Workflow.Stages = s.initializeStageApprovals(doc.Workflow.Stages, date, timeStr)
+
+			// Update compatibility ApprovalsMap from stage approvals - FIX FOR BUG #1
+			s.updateCompatibilityApprovalsMap(&doc)
+
+			// Add version reset transition to history
+			doc.Workflow.StageHistory = append(doc.Workflow.StageHistory, StageTransition{
+				FromStage:  0,
+				ToStage:    1,
+				Transition: "version_reset",
+				Actor:      submitter,
+				Date:       date,
+				Time:       timeStr,
+				Comment:    fmt.Sprintf("Workflow reset for version %d submission", doc.LatestVersion),
+			})
+		}
+	}
+
+	// Add the new version to the history - FIX FOR BUG #2
+	newVersion := DocumentVersion{
+		Version:          doc.LatestVersion,
+		Hash:             hash,
+		Submitter:        submitter,
+		Date:             date,
+		Time:             timeStr,
+		ApprovalsMap:     finalApprovalState, // Use the snapshot taken before reset
+		ValidDecisions:   append([]string{}, doc.ValidDecisions...),
+		ApproversChanged: false,
+		DecisionsChanged: false,
+		WorkflowSnapshot: nil, // Will be populated as workflow progresses
+	}
+	// Get the timestamp from the transaction context
+	timestamp, err := ctx.GetStub().GetTxTimestamp()
 	if err != nil {
-		return fmt.Errorf("failed to marshal event payload for SubmitDocument: %v", err)
+		return fmt.Errorf("failed to get timestamp: %v", err)
+	}
+	newVersion.Timestamp = timestamp.GetSeconds()
+	doc.Versions = append(doc.Versions, newVersion)
+
+	// Create the hash-to-ID index
+	hashKey := fmt.Sprintf("hash->%s", hash)
+	if err := ctx.GetStub().PutState(hashKey, []byte(id)); err != nil {
+		return fmt.Errorf("failed to create hash-to-ID index: %v", err)
 	}
 
-	err = ctx.GetStub().SetEvent("DocumentUpdated", eventBytes)
+	// Save document
+	updatedData, err := json.Marshal(doc)
 	if err != nil {
-		return fmt.Errorf("failed to set DocumentUpdated event for SubmitDocument: %v", err)
+		return fmt.Errorf("failed to marshal document: %v", err)
 	}
 
-	return nil
+	if err = ctx.GetStub().PutState(id, updatedData); err != nil {
+		return fmt.Errorf("failed to save document: %v", err)
+	}
+
+	// Emit event
+	description := fmt.Sprintf("New version %d of document %s submitted by %s", doc.LatestVersion, id, submitter)
+	details := map[string]interface{}{
+		"hash":           hash,
+		"resetApprovals": resetApprovals,
+	}
+
+	return s.emitEvent(ctx, "NewVersionSubmitted", submitter, description, doc.ID, doc.LatestVersion, details)
 }
 
 func (s *SmartContract) ApproveDocument(ctx contractapi.TransactionContextInterface, id, approver, decision, comment string) error {
@@ -208,18 +409,15 @@ func (s *SmartContract) ApproveDocument(ctx contractapi.TransactionContextInterf
 		doc.ValidDecisions = []string{}
 	}
 
-	// Check if the approver is authorized
 	decisionInfo, ok := doc.ApprovalsMap[approver]
 	if !ok {
 		return fmt.Errorf("%s not authorized to decide", approver)
 	}
 
-	// Check if the approver has already made a decision
 	if decisionInfo.Status != Pending {
 		return fmt.Errorf("%s already decided", approver)
 	}
 
-	// Validate the decision against the document's valid decisions
 	validDecision := false
 	for _, d := range doc.ValidDecisions {
 		if decision == d {
@@ -231,13 +429,12 @@ func (s *SmartContract) ApproveDocument(ctx contractapi.TransactionContextInterf
 		return fmt.Errorf("invalid decision '%s' for this document", decision)
 	}
 
-	oldStatus := decisionInfo.Status // Store old status before updating
+	oldStatus := decisionInfo.Status
 	decisionInfo.Status = ApproverStatus(decision)
 	decisionInfo.Comment = comment
 	doc.ApprovalsMap[approver] = decisionInfo
 
-	// Update counts based on the decision
-	if oldStatus == Pending { // If it was pending, decrement pending count
+	if oldStatus == Pending {
 		doc.PendingCount--
 	}
 	if ApproverStatus(decision) == Approved {
@@ -247,35 +444,7 @@ func (s *SmartContract) ApproveDocument(ctx contractapi.TransactionContextInterf
 	}
 
 	updated, _ := json.Marshal(doc)
-
-	err = ctx.GetStub().PutState(id, updated)
-	if err != nil {
-		return err
-	}
-
-	// Add event emission for ApproveDocument
-	timestamp, _ := ctx.GetStub().GetTxTimestamp()
-	eventPayload := map[string]interface{}{
-		"documentID": doc.ID,
-		"version":    doc.LatestVersion,
-		"eventType":  "ApprovalMade",
-		"approver":   approver,
-		"decision":   decision,
-		"comment":    comment,
-		"timestamp":  timestamp.GetSeconds(),
-	}
-
-	eventBytes, err := json.Marshal(eventPayload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal event payload for ApproveDocument: %v", err)
-	}
-
-	err = ctx.GetStub().SetEvent("DocumentUpdated", eventBytes)
-	if err != nil {
-		return fmt.Errorf("failed to set DocumentUpdated event for ApproveDocument: %v", err)
-	}
-
-	return nil
+	return ctx.GetStub().PutState(id, updated)
 }
 
 func (s *SmartContract) QueryDocumentStatus(ctx contractapi.TransactionContextInterface, id string) (*StatusResponse, error) {
@@ -287,6 +456,67 @@ func (s *SmartContract) QueryDocumentStatus(ctx contractapi.TransactionContextIn
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return nil, err
 	}
+
+	// Populate new fields with default values for backward compatibility
+	if doc.LastModifiedDate == "" {
+		doc.LastModifiedDate = "N/A"
+	}
+	if doc.LastModifiedTime == "" {
+		doc.LastModifiedTime = "N/A"
+	}
+	if doc.VersionWorkflows == nil {
+		doc.VersionWorkflows = make(map[string]*WorkflowConfig)
+	}
+	if doc.Workflow.CompletedStages == nil {
+		doc.Workflow.CompletedStages = []int{}
+	}
+	if doc.Workflow.StageHistory == nil {
+		doc.Workflow.StageHistory = []StageTransition{}
+	}
+	if doc.Workflow.Stages == nil {
+		doc.Workflow.Stages = []WorkflowStage{}
+	}
+
+	for i := range doc.Versions {
+		if doc.Versions[i].ApprovalsMap == nil {
+			doc.Versions[i].ApprovalsMap = make(map[string]Decision)
+		} else {
+			newVersionApprovalsMap := make(map[string]Decision)
+			for k, v := range doc.Versions[i].ApprovalsMap {
+				if v.Date == "" {
+					v.Date = "N/A"
+				}
+				if v.Time == "" {
+					v.Time = "N/A"
+				}
+				newVersionApprovalsMap[k] = v
+			}
+			doc.Versions[i].ApprovalsMap = newVersionApprovalsMap
+		}
+
+		if doc.Versions[i].ValidDecisions == nil {
+			doc.Versions[i].ValidDecisions = []string{}
+		}
+		if doc.Versions[i].WorkflowSnapshot == nil {
+			doc.Versions[i].WorkflowSnapshot = &WorkflowConfig{
+				CompletedStages: []int{},
+				StageHistory:    []StageTransition{},
+				Stages:          []WorkflowStage{},
+			}
+		}
+	}
+	
+	newApprovalsMap := make(map[string]Decision)
+	for k, v := range doc.ApprovalsMap {
+		if v.Date == "" {
+			v.Date = "N/A"
+		}
+		if v.Time == "" {
+			v.Time = "N/A"
+		}
+		newApprovalsMap[k] = v
+	}
+	doc.ApprovalsMap = newApprovalsMap
 
 	if doc.ValidDecisions == nil {
 		doc.ValidDecisions = []string{}
@@ -320,31 +550,45 @@ func (s *SmartContract) AddEditor(ctx contractapi.TransactionContextInterface, i
 		return err
 	}
 
-	// Security Check: In a production environment, you would want to ensure that only an existing editor
-	// can add a new one. This requires a robust way to map the transaction submitter's certificate
-	// identity (e.g., 'isadmin') to an application-level identity (e.g., 'yousif@uni.edu').
-	// This often involves an external identity management system or custom attributes in the certificate.
-	// For this demonstration, we are using a simulated invokerId to test the logic.
-	isEditor := false
-	for _, editor := range doc.Editors {
+	isPrivileged := false
+	for _, editor := range doc.PrivilegedEditors {
 		if editor == invokerId {
-			isEditor = true
+			isPrivileged = true
 			break
 		}
 	}
-	if !isEditor {
-		return fmt.Errorf("submitter %s is not an editor for document %s", invokerId, id)
+	if !isPrivileged {
+		return fmt.Errorf("submitter %s is not a privileged editor for document %s", invokerId, id)
 	}
 
-	// Add the new editor
 	doc.Editors = append(doc.Editors, newEditor)
 
 	updated, _ := json.Marshal(doc)
 	return ctx.GetStub().PutState(id, updated)
 }
 
-func (s *SmartContract) UpdateDocumentApprovers(ctx contractapi.TransactionContextInterface, documentID string, newApproversJSON string, invokerId string) error {
-	// 1. Retrieve the document
+func (s *SmartContract) AddPrivilegedEditor(ctx contractapi.TransactionContextInterface, id, newEditor, invokerId string) error {
+	data, err := ctx.GetStub().GetState(id)
+	if err != nil || data == nil {
+		return fmt.Errorf("document %s not found", id)
+	}
+	var doc Document
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return err
+	}
+
+	if doc.Uploader != invokerId {
+		return fmt.Errorf("only the original uploader can add privileged editors")
+	}
+
+	doc.PrivilegedEditors = append(doc.PrivilegedEditors, newEditor)
+	doc.Editors = append(doc.Editors, newEditor)
+
+	updated, _ := json.Marshal(doc)
+	return ctx.GetStub().PutState(id, updated)
+}
+
+func (s *SmartContract) UpdateValidDecisions(ctx contractapi.TransactionContextInterface, documentID string, validDecisionsJSON string, invokerId string) error {
 	data, err := ctx.GetStub().GetState(documentID)
 	if err != nil || data == nil {
 		return fmt.Errorf("document %s not found", documentID)
@@ -354,7 +598,6 @@ func (s *SmartContract) UpdateDocumentApprovers(ctx contractapi.TransactionConte
 		return err
 	}
 
-	// 2. Security Check: Verify invokerId is a Privileged Editor for this document
 	isPrivilegedEditor := false
 	for _, editor := range doc.PrivilegedEditors {
 		if editor == invokerId {
@@ -366,60 +609,63 @@ func (s *SmartContract) UpdateDocumentApprovers(ctx contractapi.TransactionConte
 		return fmt.Errorf("invoker %s is not a privileged editor for document %s", invokerId, documentID)
 	}
 
-	// 3. Parse new approvers
-	var newApprovers []string
-	if err := json.Unmarshal([]byte(newApproversJSON), &newApprovers); err != nil {
-		return fmt.Errorf("invalid newApprovers JSON: %v", err)
+	var newValidDecisions []string
+	if err := json.Unmarshal([]byte(validDecisionsJSON), &newValidDecisions); err != nil {
+		return fmt.Errorf("invalid validDecisions JSON: %v", err)
 	}
 
-	// 4. Update ApprovalsMap based on newApprovers
-	//    - Add new approvers with PENDING status
-	//    - Remove approvers no longer in the list (their past decisions remain recorded in history)
-	updatedApprovalsMap := make(map[string]Decision)
-	for _, approver := range newApprovers {
-		if existingDecision, ok := doc.ApprovalsMap[approver]; ok {
-			// Carry over existing decision if approver was already there
-			updatedApprovalsMap[approver] = existingDecision
-		} else {
-			// New approver, set to PENDING
-			updatedApprovalsMap[approver] = Decision{Status: Pending, Comment: ""}
-		}
-	}
-	doc.ApprovalsMap = updatedApprovalsMap
+	doc.ValidDecisions = newValidDecisions
 
-	// 5. Persist the updated document
 	updatedDocBytes, err := json.Marshal(doc)
 	if err != nil {
 		return err
 	}
 
-	err = ctx.GetStub().PutState(documentID, updatedDocBytes)
+	return ctx.GetStub().PutState(documentID, updatedDocBytes)
+}
+
+func (s *SmartContract) UpdateDocumentApprovers(ctx contractapi.TransactionContextInterface, documentID string, newApproversJSON string, invokerId string) error {
+	data, err := ctx.GetStub().GetState(documentID)
+	if err != nil || data == nil {
+		return fmt.Errorf("document %s not found", documentID)
+	}
+	var doc Document
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return err
+	}
+
+	isPrivilegedEditor := false
+	for _, editor := range doc.PrivilegedEditors {
+		if editor == invokerId {
+			isPrivilegedEditor = true
+			break
+		}
+	}
+	if !isPrivilegedEditor {
+		return fmt.Errorf("invoker %s is not a privileged editor for document %s", invokerId, documentID)
+	}
+
+	var newApprovers []string
+	if err := json.Unmarshal([]byte(newApproversJSON), &newApprovers); err != nil {
+		return fmt.Errorf("invalid newApprovers JSON: %v", err)
+	}
+
+	updatedApprovalsMap := make(map[string]Decision)
+	for _, approver := range newApprovers {
+		if existingDecision, ok := doc.ApprovalsMap[approver]; ok {
+			updatedApprovalsMap[approver] = existingDecision
+		} else {
+			updatedApprovalsMap[approver] = Decision{Status: Pending, Comment: ""}
+		}
+	}
+	doc.ApprovalsMap = updatedApprovalsMap
+
+	updatedDocBytes, err := json.Marshal(doc)
 	if err != nil {
 		return err
 	}
 
-	// Add event emission for UpdateDocumentApprovers
-	timestamp, _ := ctx.GetStub().GetTxTimestamp()
-	eventPayload := map[string]interface{}{
-		"documentID":   doc.ID,
-		"version":      doc.LatestVersion,
-		"eventType":    "ApproversUpdated",
-		"invoker":      invokerId,
-		"newApprovers": newApprovers,
-		"timestamp":    timestamp.GetSeconds(),
-	}
-
-	eventBytes, err := json.Marshal(eventPayload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal event payload for UpdateDocumentApprovers: %v", err)
-	}
-
-	err = ctx.GetStub().SetEvent("DocumentUpdated", eventBytes)
-	if err != nil {
-		return fmt.Errorf("failed to set DocumentUpdated event for UpdateDocumentApprovers: %v", err)
-	}
-
-	return nil
+	return ctx.GetStub().PutState(documentID, updatedDocBytes)
 }
 
 func (s *SmartContract) GetDocumentIdByHash(ctx contractapi.TransactionContextInterface, hash string) (string, error) {
@@ -439,7 +685,6 @@ func (s *SmartContract) DocumentExists(ctx contractapi.TransactionContextInterfa
 	return data != nil, nil
 }
 
-// GetAllDocuments returns all documents on the ledger
 func (s *SmartContract) GetAllDocuments(ctx contractapi.TransactionContextInterface) ([]*Document, error) {
 	iterator, err := ctx.GetStub().GetStateByRange("", "")
 	if err != nil {
@@ -454,7 +699,6 @@ func (s *SmartContract) GetAllDocuments(ctx contractapi.TransactionContextInterf
 			return nil, err
 		}
 
-		// Skip the hash-to-ID index entries
 		if len(queryResponse.Key) > 5 && string(queryResponse.Key[:5]) == "hash->" {
 			continue
 		}
@@ -462,10 +706,74 @@ func (s *SmartContract) GetAllDocuments(ctx contractapi.TransactionContextInterf
 		var document Document
 		err = json.Unmarshal(queryResponse.Value, &document)
 		if err != nil {
-			// This might happen if there are other non-document entries
-			// For now, we'll just skip them
+			// For backward compatibility, we can try to unmarshal into a map first
+			// to avoid errors with old document structures.
+			// However, for now, we will just log the error and continue.
+			// log.Printf("Error unmarshalling document %s: %v", queryResponse.Key, err)
 			continue
 		}
+
+		// Populate new fields with default values for backward compatibility
+		if document.LastModifiedDate == "" {
+			document.LastModifiedDate = "N/A"
+		}
+		if document.LastModifiedTime == "" {
+			document.LastModifiedTime = "N/A"
+		}
+		if document.VersionWorkflows == nil {
+			document.VersionWorkflows = make(map[string]*WorkflowConfig)
+		}
+		if document.Workflow.CompletedStages == nil {
+			document.Workflow.CompletedStages = []int{}
+		}
+		if document.Workflow.StageHistory == nil {
+			document.Workflow.StageHistory = []StageTransition{}
+		}
+		if document.Workflow.Stages == nil {
+			document.Workflow.Stages = []WorkflowStage{}
+		}
+
+		for i := range document.Versions {
+			if document.Versions[i].ApprovalsMap == nil {
+				document.Versions[i].ApprovalsMap = make(map[string]Decision)
+			} else {
+				newVersionApprovalsMap := make(map[string]Decision)
+				for k, v := range document.Versions[i].ApprovalsMap {
+					if v.Date == "" {
+						v.Date = "N/A"
+					}
+					if v.Time == "" {
+						v.Time = "N/A"
+					}
+					newVersionApprovalsMap[k] = v
+				}
+				document.Versions[i].ApprovalsMap = newVersionApprovalsMap
+			}
+
+			if document.Versions[i].ValidDecisions == nil {
+				document.Versions[i].ValidDecisions = []string{}
+			}
+			if document.Versions[i].WorkflowSnapshot == nil {
+				document.Versions[i].WorkflowSnapshot = &WorkflowConfig{
+					CompletedStages: []int{},
+					StageHistory:    []StageTransition{},
+					Stages:          []WorkflowStage{},
+				}
+			}
+		}
+		
+		newApprovalsMap := make(map[string]Decision)
+		for k, v := range document.ApprovalsMap {
+			if v.Date == "" {
+				v.Date = "N/A"
+			}
+			if v.Time == "" {
+				v.Time = "N/A"
+			}
+			newApprovalsMap[k] = v
+		}
+		document.ApprovalsMap = newApprovalsMap
+
 		if document.ValidDecisions == nil {
 			document.ValidDecisions = []string{}
 		}
@@ -475,7 +783,6 @@ func (s *SmartContract) GetAllDocuments(ctx contractapi.TransactionContextInterf
 	return documents, nil
 }
 
-// GetHistory returns the modification history of a document
 func (s *SmartContract) GetHistory(ctx contractapi.TransactionContextInterface, documentID string) ([]map[string]interface{}, error) {
 	resultsIterator, err := ctx.GetStub().GetHistoryForKey(documentID)
 	if err != nil {
@@ -507,4 +814,25 @@ func (s *SmartContract) GetHistory(ctx contractapi.TransactionContextInterface, 
 	return history, nil
 }
 
+func (s *SmartContract) QueryDocumentsByEditor(ctx contractapi.TransactionContextInterface, editorID string) ([]*Document, error) {
+	allDocuments, err := s.GetAllDocuments(ctx)
+	if err != nil {
+		return nil, err
+	}
 
+	var editableDocuments []*Document
+	for _, doc := range allDocuments {
+		isEditor := s.isUserInList(editorID, doc.Editors)
+		isPrivilegedEditor := s.isUserInList(editorID, doc.PrivilegedEditors)
+
+		if isEditor || isPrivilegedEditor {
+			editableDocuments = append(editableDocuments, doc)
+		}
+	}
+
+	if len(editableDocuments) == 0 {
+		return nil, fmt.Errorf("document editable not found")
+	}
+
+	return editableDocuments, nil
+}

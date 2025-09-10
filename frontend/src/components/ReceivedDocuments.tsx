@@ -149,7 +149,7 @@ const ReceivedDocuments: React.FC<ReceivedDocumentsProps> = ({ userRole }) => {
               <tr>
                 <th>Document Name</th>
                 <th>Sender</th>
-                <th>Status</th>
+                {userRole !== 'student' && <th>Status</th>}
                 <th>Actions</th>
               </tr>
             </thead>
@@ -170,16 +170,18 @@ const ReceivedDocuments: React.FC<ReceivedDocumentsProps> = ({ userRole }) => {
                     )}
                   </td>
                   <td>{doc.sender_username}</td>
-                  <td>
-                    <span className={`badge rounded-pill ${
-                      doc.status === 'APPROVED' ? 'bg-success' :
-                      doc.status === 'REJECTED' ? 'bg-danger' :
-                      doc.status.includes('ERROR') ? 'bg-secondary' :
-                      'bg-warning text-dark'
-                    }`}>
-                      {doc.status}
-                    </span>
-                  </td>
+                  {userRole !== 'student' &&
+                    <td>
+                      <span className={`badge rounded-pill ${
+                        doc.status === 'APPROVED' ? 'bg-success' :
+                        doc.status === 'REJECTED' ? 'bg-danger' :
+                        doc.status.includes('ERROR') ? 'bg-secondary' :
+                        'bg-warning text-dark'
+                      }`}>
+                        {doc.status}
+                      </span>
+                    </td>
+                  }
                   <td>
                     <div className="d-flex justify-content-center">
                       <Link to={`/view/${doc.doc_id}`}>

@@ -8,7 +8,7 @@ const FacultyDashboard = () => {
       <h2 className="my-4 text-center text-primary">Your Dashboard</h2>
 
       <Row className="g-4">
-        <Col md={4}>
+        <Col md={6}>
           <Card className="h-100 shadow-sm">
             <Card.Body className="d-flex flex-column">
               <Card.Title className="text-primary">Uploaded Documents</Card.Title>
@@ -23,7 +23,7 @@ const FacultyDashboard = () => {
             </Card.Body>
           </Card>
         </Col>
-        <Col md={4}>
+        <Col md={6}>
           <Card className="h-100 shadow-sm">
             <Card.Body className="d-flex flex-column">
               <Card.Title className="text-primary">Received Documents</Card.Title>
@@ -38,7 +38,7 @@ const FacultyDashboard = () => {
             </Card.Body>
           </Card>
         </Col>
-        <Col md={4}>
+        <Col md={6}>
           <Card className="h-100 shadow-sm">
             <Card.Body className="d-flex flex-column">
               <Card.Title className="text-primary">Upload Document</Card.Title>
@@ -48,6 +48,21 @@ const FacultyDashboard = () => {
               <div className="mt-auto">
                 <Link to="/upload">
                   <Button variant="success">Upload New Document</Button>
+                </Link>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+        <Col md={6}>
+          <Card className="h-100 shadow-sm">
+            <Card.Body className="d-flex flex-column">
+              <Card.Title className="text-primary">Documents to Edit</Card.Title>
+              <Card.Text className="flex-grow-1">
+                Edit documents that have been assigned to you.
+              </Card.Text>
+              <div className="mt-auto">
+                <Link to="/documents-to-edit">
+                  <Button variant="primary">View Documents to Edit</Button>
                 </Link>
               </div>
             </Card.Body>

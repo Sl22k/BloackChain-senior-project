@@ -13,7 +13,7 @@ interface Notification {
   approver_username?: string;
   status: string;
   created_at: string;
-  type: 'new_document' | 'status_change' | 'training_application' | 'document_approved' | 'document_rejected';
+  type: 'new_document' | 'status_change' | 'training_application' | 'document_approved' | 'document_rejected' | 'editor_assignment';
   viewed: boolean;
   api_type: 'receiver' | 'sender';
   student_name?: string;
@@ -76,6 +76,8 @@ const NotificationBox: React.FC<NotificationBoxProps> = ({ notificationTrigger, 
       fetchNotifications();
       if (notification.type === 'training_application') {
         navigate('/training'); // Navigate to training page for training applications
+      } else if (notification.type === 'editor_assignment') {
+        navigate('/documents-to-edit');
       } else {
         navigate(`/view/${notification.doc_id}`);
       }
@@ -139,6 +141,10 @@ const NotificationBox: React.FC<NotificationBoxProps> = ({ notificationTrigger, 
                 ) : notification.type === 'document_rejected' ? (
                   <>
                     <strong>{renderPotentiallyNestedString(notification.approver_username)}</strong> has rejected your document <strong>{renderPotentiallyNestedString(notification.doc_name)}</strong>.
+                  </>
+                ) : notification.type === 'editor_assignment' ? (
+                  <>
+                    You have been assigned to edit document <strong>{renderPotentiallyNestedString(notification.doc_name)}</strong> by <strong>{renderPotentiallyNestedString(notification.sender_username)}</strong>.
                   </>
                 ) : (
                   <>

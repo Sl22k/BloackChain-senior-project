@@ -17,12 +17,14 @@ import UploadedDocuments from './components/UploadedDocuments';
 import ReceivedDocuments from './components/ReceivedDocuments';
 import DocumentViewer from './components/DocumentViewer';
 import UploadDocument from './components/UploadDocument';
+import DocumentsToEdit from './components/DocumentsToEdit';
 import NotificationBox from './components/NotificationBox';
 import Notifications from './components/Notifications';
 import SenderNotifications from './components/SenderNotifications';
 import Training from './components/Training';
 import AddEditor from './components/AddEditor';
 import UpdateApprovers from './components/UpdateApprovers';
+import UpdateDecisions from './components/UpdateDecisions';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import './App.css';
 
@@ -247,19 +249,16 @@ function MainContent() {
               <Route path="/coordinator-dashboard" element={<ProtectedRoute userRole={userRole} authLoading={authLoading} allowedRoles={['coordinator']}><CoordinatorDashboard /></ProtectedRoute>} />
               {/* Other protected routes */}
               <Route path="/received" element={<ProtectedRoute userRole={userRole} authLoading={authLoading} allowedRoles={['student', 'faculty', 'coordinator']}><ReceivedDocuments userRole={userRole} /></ProtectedRoute>} />
-              <Route path="/view/:documentId" element={<ProtectedRoute userRole={userRole} authLoading={authLoading} allowedRoles={['student', 'faculty', 'coordinator']}><DocumentViewer userRole={userRole} /></ProtectedRoute>} />
+              <Route path="/view/:documentId" element={<ProtectedRoute userRole={userRole} authLoading={authLoading} allowedRoles={['student', 'faculty', 'coordinator']}><DocumentViewer userRole={userRole} loggedInUser={loggedInUser} /></ProtectedRoute>} />
               <Route path="/upload" element={<ProtectedRoute userRole={userRole} authLoading={authLoading} allowedRoles={['student', 'faculty', 'coordinator']}><UploadDocument loggedInUser={loggedInUser} userEmail={userEmail} /></ProtectedRoute>} />
               <Route path="/uploaded" element={<ProtectedRoute userRole={userRole} authLoading={authLoading} allowedRoles={['student', 'faculty', 'coordinator']}><UploadedDocuments /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute userRole={userRole} authLoading={authLoading} allowedRoles={['student', 'faculty', 'coordinator']}><Notifications loggedInUser={loggedInUser} userEmail={userEmail} userRole={userRole} /></ProtectedRoute>} />
-              import AddEditor from './components/AddEditor';
-import UpdateApprovers from './components/UpdateApprovers';
-
-// ... (rest of the file)
-
               <Route path="/sender-notifications" element={<ProtectedRoute userRole={userRole} authLoading={authLoading} allowedRoles={['student', 'faculty', 'coordinator']}><SenderNotifications /></ProtectedRoute>} />
               <Route path="/training" element={<ProtectedRoute userRole={userRole} authLoading={authLoading} allowedRoles={['coordinator', 'student']}><Training userRole={userRole} userEmail={userEmail} loggedInUser={loggedInUser} /></ProtectedRoute>} />
-              <Route path="/documents/:documentId/add-editor" element={<ProtectedRoute userRole={userRole} authLoading={authLoading} allowedRoles={['faculty', 'coordinator']}><AddEditor /></ProtectedRoute>} />
-              <Route path="/documents/:documentId/update-approvers" element={<ProtectedRoute userRole={userRole} authLoading={authLoading} allowedRoles={['faculty', 'coordinator']}><UpdateApprovers /></ProtectedRoute>} />
+              <Route path="/documents/:documentId/add-editor" element={<ProtectedRoute userRole={userRole} authLoading={authLoading} allowedRoles={['student', 'faculty', 'coordinator']}><AddEditor /></ProtectedRoute>} />
+              <Route path="/documents/:documentId/update-approvers" element={<ProtectedRoute userRole={userRole} authLoading={authLoading} allowedRoles={['student', 'faculty', 'coordinator']}><UpdateApprovers /></ProtectedRoute>} />
+              <Route path="/documents-to-edit" element={<ProtectedRoute userRole={userRole} authLoading={authLoading} allowedRoles={['faculty', 'coordinator']}><DocumentsToEdit /></ProtectedRoute>} />
+              {/* <Route path="/documents/:documentId/update-decisions" element={<ProtectedRoute userRole={userRole} authLoading={authLoading} allowedRoles={['student', 'faculty', 'coordinator']}><UpdateDecisions /></ProtectedRoute>} /> */}
             </Routes>
           </ErrorBoundary>
       </main>

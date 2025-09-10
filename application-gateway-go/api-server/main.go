@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"bytes"
 	"context"
 	"crypto/x509"
@@ -47,24 +48,24 @@ var fcmClient *messaging.Client
 
 // corsMiddleware sets CORS headers for all requests
 func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[CORS] Request received: %s %s", r.Method, r.URL.Path)
-		// Allow requests from your React frontend origin
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
-		// Allow specific methods
-		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-		// Allow specific headers
-		w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        log.Printf("[CORS] Request received: %s %s", r.Method, r.URL.Path)
+        // Allow requests from your React frontend origin
+        w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+        // Allow specific methods
+        w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+        // Allow specific headers
+        w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
 
-		// Handle preflight OPTIONS requests
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
+        // Handle preflight OPTIONS requests
+        if r.Method == "OPTIONS" {
+            w.WriteHeader(http.StatusOK)
+            return
+        }
 
-		// Pass the request to the next handler
-		next.ServeHTTP(w, r)
-	})
+        // Pass the request to the next handler
+        next.ServeHTTP(w, r)
+    })
 }
 
 // AuthMiddleware validates JWT tokens and sets user context
@@ -181,9 +182,11 @@ func main() {
 	r.HandleFunc("/api/documents/{id}/approve", approveDocumentHandler(contract)).Methods("POST")
 	r.HandleFunc("/api/documents/{id}/editors", addEditorHandler(contract)).Methods("POST")
 	r.HandleFunc("/api/documents/{id}/approvers", updateApproversHandler(contract)).Methods("PUT")
+	r.HandleFunc("/api/documents/{id}/versions", submitNewVersionHandler(contract)).Methods("POST")
 	r.HandleFunc("/api/documents/{documentId}", deleteDocumentHandler).Methods("DELETE")
 	r.HandleFunc("/api/documents/{docId}/history", getDocumentHistoryHandler(contract)).Methods("GET")
 	r.HandleFunc("/api/documents/{documentId:.+}/status", getDocumentStatusHandler).Methods("GET")
+	r.HandleFunc("/api/documents/editable", getEditableDocumentsHandler(contract)).Methods("GET")
 
 	// Authentication routes
 	r.HandleFunc("/api/auth/register", registerHandler).Methods("POST")
@@ -780,10 +783,13 @@ func submitDocumentHandler(contract *client.Contract) http.HandlerFunc {
             // The old code continued, so we will too. The state will be synced by a later read.
         } else {
             var statusResp struct {
-                ApprovedCount int               `json:"ApprovedCount"`
-                RejectedCount int               `json:"RejectedCount"`
-                PendingCount  int               `json:"PendingCount"`
-                ApprovalsMap  map[string]string `json:"ApprovalsMap"` // Get the full map
+                ApprovedCount int    `json:"ApprovedCount"`
+                RejectedCount int    `json:"RejectedCount"`
+                PendingCount  int    `json:"PendingCount"`
+                ApprovalsMap  map[string]struct {
+                    Status  string `json:"Status"`
+                    Comment string `json:"Comment"`
+                } `json:"ApprovalsMap"`
             }
             if err := json.Unmarshal(chaincodeResult, &statusResp); err != nil {
                 log.Printf("Error unmarshaling status after approval for doc %s: %v", id, err)
@@ -807,9 +813,9 @@ func submitDocumentHandler(contract *client.Contract) http.HandlerFunc {
                     log.Printf("Error finding document with doc_id %s to update shares: %v", id, err)
                 } else {
                     // Sync all receiver statuses from the chaincode's response
-                    for receiver, status := range statusResp.ApprovalsMap {
-                        updateShareSQL := `UPDATE document_shares SET status = $1 WHERE document_id = $2 AND receiver_username = $3`
-                        _, err := database.DB.Exec(updateShareSQL, status, documentDBID, receiver)
+                    for receiver, decision := range statusResp.ApprovalsMap {
+                        updateShareSQL := `UPDATE document_shares SET status = $1, comment = $2 WHERE document_id = $3 AND receiver_username = $4`
+                        _, err := database.DB.Exec(updateShareSQL, decision.Status, decision.Comment, documentDBID, receiver)
                         if err != nil {
                             // Log error but continue, to try and update as many as possible
                             log.Printf("Error updating document share for receiver %s on doc %s: %v", receiver, id, err)
@@ -1564,6 +1570,14 @@ func searchSuggestionsHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(suggestions)
 }
+func getEditableDocumentsHandler(contract *client.Contract) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        // TODO: Implement logic to fetch editable documents for the user
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusOK)
+        json.NewEncoder(w).Encode([]interface{}{}) // Return empty array for now
+    }
+}
 
 func getDocumentsByUploaderHandler(contract *client.Contract) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -1669,6 +1683,108 @@ func getDocumentsByUploaderHandler(contract *client.Contract) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(documents)
+	}
+}
+
+func submitNewVersionHandler(contract *client.Contract) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// 1. Parse multipart form
+		err := r.ParseMultipartForm(10 << 20) // 10 MB
+		if err != nil {
+			sendJSONError(w, "Error parsing multipart form", http.StatusBadRequest)
+			return
+		}
+
+		// 2. Get document ID from URL
+		vars := mux.Vars(r)
+		id := vars["id"]
+
+		// 3. Get file from form
+		file, handler, err := r.FormFile("file")
+		if err != nil {
+			sendJSONError(w, "Error retrieving the file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// 4. Get other form fields
+		keepApprovalsStr := r.FormValue("keepApprovals")
+		uploader := r.FormValue("uploader")
+
+		keepApprovals, err := strconv.ParseBool(keepApprovalsStr)
+		if err != nil {
+			sendJSONError(w, "Invalid value for keepApprovals", http.StatusBadRequest)
+			return
+		}
+		resetApprovals := !keepApprovals
+
+		// 5. Calculate file hash
+		fileBytes, err := io.ReadAll(file)
+		if err != nil {
+			sendJSONError(w, "Error reading file content", http.StatusInternalServerError)
+			return
+		}
+		hash := fmt.Sprintf("%x", sha256.Sum256(fileBytes))
+
+		// 6. Submit to Fabric chaincode
+		_, err = contract.SubmitTransaction("SubmitNewVersion", id, hash, uploader, strconv.FormatBool(resetApprovals))
+		if err != nil {
+			log.Printf("Error submitting new version to Fabric: %v", err)
+			sendJSONError(w, fmt.Sprintf("Failed to submit new version to Fabric: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		// --- START of new notification logic ---
+		if resetApprovals {
+			time.Sleep(2 * time.Second) // Delay to allow ledger commit
+
+			var documentDBID int
+			var docName string
+			err := database.DB.QueryRow("SELECT id, doc_name FROM documents WHERE doc_id = $1", id).Scan(&documentDBID, &docName)
+			if err != nil {
+				log.Printf("Error getting document from DB for notification: %v", err)
+			} else {
+				chaincodeResult, err := contract.EvaluateTransaction("QueryDocumentStatus", id)
+				if err != nil {
+					log.Printf("Error querying document status for notification: %v", err)
+				} else {
+					var statusResp struct {
+						ApprovalsMap map[string]interface{} `json:"ApprovalsMap"`
+					}
+					if err := json.Unmarshal(chaincodeResult, &statusResp); err == nil {
+						for approverUsername := range statusResp.ApprovalsMap {
+							updateShareSQL := `UPDATE document_shares SET status = 'PENDING', comment = '', viewed = false WHERE document_id = $1 AND receiver_username = $2`
+							if _, err := database.DB.Exec(updateShareSQL, documentDBID, approverUsername); err != nil {
+								log.Printf("Error updating document share for %s: %v", approverUsername, err)
+							}
+
+							if user, err := database.GetUserByUsername(approverUsername); err == nil && user != nil && user.Email != "" {
+								title := "New Document Version for Approval"
+								body := fmt.Sprintf("A new version of document '%s' by %s is ready for your approval.", docName, uploader)
+								sendFCMNotification(user.Email, title, body)
+							}
+						}
+					}
+				}
+			}
+		}
+		// --- END of new notification logic ---
+
+		// 7. Save the new version of the file to the uploads directory
+		dst, err := os.Create(fmt.Sprintf("../../uploads/%s", handler.Filename))
+		if err != nil {
+			log.Printf("Failed to create file: %v", err)
+		} else {
+			defer dst.Close()
+			_, err = dst.Write(fileBytes)
+			if err != nil {
+				log.Printf("Failed to save new version of the file: %v", err)
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"message": "New version submitted successfully"})
 	}
 }
 
@@ -1833,7 +1949,7 @@ func getNotificationsHandler(contract *client.Contract) http.HandlerFunc {
 			DocID          string    `json:"doc_id"`
 			DocName        string    `json:"doc_name"`
 			SenderUsername string    `json:"sender_username"`
-			ApproverUsername sql.NullString `json:"approver_username"`
+			ApproverUsername sql.NullString    `json:"approver_username"`
 			Status         string    `json:"status"`
 			CreatedAt      time.Time `json:"created_at"`
 			Type           string    `json:"type"`
@@ -1938,7 +2054,6 @@ func getUnreadNotificationCountHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]int{"count": count})
-
 	
 }
 
@@ -1990,7 +2105,7 @@ func getUnreadSenderNotificationCountHandler(w http.ResponseWriter, r *http.Requ
 		log.Printf("[UNREAD-SENDER-COUNT-FAIL] Error querying unread sender notification count from DB: %v", err)
 		sendJSONError(w, "Server error fetching unread sender notification count", http.StatusInternalServerError)
 		return
-		}
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]int{"count": count})
 }

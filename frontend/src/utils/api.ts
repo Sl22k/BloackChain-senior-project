@@ -19,18 +19,18 @@ export async function apiFetch(url: string, options?: RequestInit) {
   });
   
   if (!response.ok) {
-    let errorMessage = `HTTP error! Status: ${response.status}`;
+    let errorMessage;
+    const errorBodyText = await response.text().catch(() => response.statusText); // Read body as text, fallback to statusText
+
     try {
-      const errorBody = await response.json();
-      if (errorBody.message) {
-        errorMessage = errorBody.message;
-      } else if (errorBody.error) {
-        errorMessage = errorBody.error;
-      }
+        // Try to parse it as JSON
+        const errorBody = JSON.parse(errorBodyText);
+        errorMessage = errorBody.message || errorBody.error || response.statusText;
     } catch (e) {
-      // If response is not JSON, use the status text or a generic message
-      errorMessage = response.statusText || 'An unexpected error occurred';
+        // If not JSON, use the text itself as the error (or part of it)
+        errorMessage = errorBodyText || response.statusText;
     }
+    
     console.error(`API Error: ${url} - ${errorMessage}`);
     throw new Error(errorMessage);
   }
@@ -42,9 +42,17 @@ export async function apiFetch(url: string, options?: RequestInit) {
   }
 
   if (contentType.includes('application/json')) {
-    // Check if the response body is empty before parsing as JSON
     const text = await response.text();
-    return text ? JSON.parse(text) : null;
+    if (!text) {
+      return []; // Return empty array for empty body, as lists are expected
+    }
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      console.error("Failed to parse JSON response:", text, e);
+      // If parsing fails, return an empty array as a safe default for list-based components
+      return [];
+    }
   } else if (contentType.includes('text/')) {
     // If it's text, return the text directly
     return response.text();

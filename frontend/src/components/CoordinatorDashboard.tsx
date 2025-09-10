@@ -118,6 +118,21 @@ const CoordinatorDashboard = () => {
             </Card.Body>
           </Card>
         </Col>
+        <Col md={4}>
+          <Card className="h-100 shadow-sm">
+            <Card.Body className="d-flex flex-column">
+              <Card.Title className="text-primary">Documents to Edit</Card.Title>
+              <Card.Text className="flex-grow-1">
+                Edit documents that have been assigned to you.
+              </Card.Text>
+              <div className="mt-auto">
+                <Link to="/documents-to-edit">
+                  <Button variant="primary">View Documents to Edit</Button>
+                </Link>
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
       </Row>
     </div>
   );

@@ -64,6 +64,7 @@ const Login = ({ setLoggedInUser, setUserRole }: LoginProps) => {
       }
 
       localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(user));
       setAuthToken(response.token); // Set token in api utility
 
       console.log('Calling setLoggedInUser and setUserRole with:', user.id, user.role);

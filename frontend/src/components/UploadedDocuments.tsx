@@ -108,7 +108,6 @@ const UploadedDocuments = () => {
             <thead className="bg-primary text-white">
               <tr>
                 <th>Document Name</th>
-                <th>Approver Status</th>
                 <th>Approved</th>
                 <th>Rejected</th>
                 <th>Pending</th>
@@ -127,17 +126,6 @@ const UploadedDocuments = () => {
                       >
                         <small className="text-muted">{`Hash: ${doc.hash}`}</small>
                       </OverlayTrigger>
-                    )}
-                  </td>
-                   <td>
-                    {doc.approvals_map && Object.keys(doc.approvals_map).length > 0 ? (
-                      Object.entries(doc.approvals_map).map(([receiver_username, status]) => (
-                        <div key={receiver_username} className="mb-1">
-                          <strong>{receiver_username}:</strong> {getStatusBadge(status)} 
-                        </div>
-                      ))
-                    ) : (
-                      <div>{getStatusBadge('PENDING')}</div>
                     )}
                   </td>
                   <td><Badge bg="success">{doc.approved_count}</Badge></td>

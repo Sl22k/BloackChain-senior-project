@@ -1,0 +1,11 @@
+{
+  "index": {
+    "fields": [
+      {"LastModifiedDate": "desc"},
+      {"LastModifiedTime": "desc"}
+    ]
+  },
+  "ddoc": "indexRecentDoc",
+  "name": "indexRecent", 
+  "type": "json"
+}

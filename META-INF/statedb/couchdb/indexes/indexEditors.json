@@ -1,0 +1,12 @@
+{
+  "index": {
+    "fields": [
+      "Editors",
+      "PrivilegedEditors",
+      "LastModifiedDate"
+    ]
+  },
+  "ddoc": "indexEditorsDoc",
+  "name": "indexEditors",
+  "type": "json"
+}

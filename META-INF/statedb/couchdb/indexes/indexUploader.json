@@ -1,0 +1,12 @@
+{
+  "index": {
+    "fields": [
+      "Uploader",
+      {"CreatedDate": "desc"},
+      {"CreatedTime": "desc"}
+    ]
+  },
+  "ddoc": "indexUploaderDoc",
+  "name": "indexUploader",
+  "type": "json"
+}

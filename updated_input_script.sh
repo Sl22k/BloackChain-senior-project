@@ -192,16 +192,16 @@ collect_approver_group() {
     while true; do
         read -p "Enter choice [1-7]: " choice
         case $choice in
-            1) echo "[\"legal1\",\"legal2\",\"legal3\"]"; break;;
-            2) echo "[\"dev1\",\"dev2\",\"architect1\"]"; break;;
-            3) echo "[\"ceo\",\"cfo\",\"cto\"]"; break;;
-            4) echo "[\"finance1\",\"finance2\",\"controller\"]"; break;;
-            5) echo "[\"legal1\",\"dev1\",\"finance1\"]"; break;;
+            1) echo "[\\\"legal1\\\",\\\"legal2\\\",\\\"legal3\\\"]"; break;;
+            2) echo "[\\\"dev1\\\",\\\"dev2\\\",\\\"architect1\\\"]"; break;;
+            3) echo "[\\\"ceo\\\",\\\"cfo\\\",\\\"cto\\\"]"; break;;
+            4) echo "[\\\"finance1\\\",\\\"finance2\\\",\\\"controller\\\"]"; break;;
+            5) echo "[\\\"legal1\\\",\\\"dev1\\\",\\\"finance1\\\"]"; break;;
             6) 
                 echo -e "${BLUE}Enter single approver username:${NC}" >&2
                 read -p "> " single_user
                 if [ ! -z "$single_user" ]; then
-                    echo "[\"$single_user\"]"
+                    echo "[\\\"$single_user\\\"]"
                     break
                 else
                     echo -e "${RED}Please enter a username.${NC}" >&2
@@ -213,7 +213,8 @@ collect_approver_group() {
                 read -p "> " custom_input
                 if [ ! -z "$custom_input" ]; then
                     formatted_input=$(echo "$custom_input" | tr -d ' ' | sed 's/,/","/g; s/^/["/; s/$/"]/')
-                    echo "$formatted_input"
+                    escaped_input=$(echo "$formatted_input" | sed 's/"/\\"/g')
+                    echo "$escaped_input"
                     break
                 else
                     echo -e "${RED}Please enter at least one approver.${NC}" >&2
@@ -533,12 +534,22 @@ while true; do
                     echo -e "${GREEN}=== Multi-Stage Workflow Builder ===${NC}"
                     echo -e "${YELLOW}Building advanced workflow...${NC}"
                     
-                    # Extract approvers from Stage 1 for JSON building
-                    stage1_approvers_list=$(echo "$stage1_approvers_json" | sed 's/^\[//' | sed 's/\]$//')
+                    # First stage name input
+                    echo -e "${BLUE}--- Stage 1 ---${NC}"
+                    read -p "Enter name for Stage 1: " stage1_name
+                    if [[ "$stage1_name" == "" ]]; then
+                        stage1_name="Review and Approval"
+                    fi
+                    read -p "Enter description for Stage 1 (optional): " stage1_description
                     
-                    # Build workflow stages JSON
+                    # Extract approvers from Stage 1 for raw JSON building
+                    stage1_approvers_list=$(echo "$stage1_approvers_json" | sed 's/^\[\\\"/\"/' | sed 's/\\\"\]$/\"/' | sed 's/\\\",\\\"/\",\"/g')
+                    
+                    # Build workflow stages JSON without escaping (for raw JSON)
                     workflow_stages=""
-                    stage1_json="{\"StageNumber\":1,\"StageName\":\"Review and Approval\",\"Approvers\":[$stage1_approvers_list],\"RequiredCount\":$stage1_required,\"AutoAdvance\":true,\"Description\":\"Primary approval stage\"}"
+                    escaped_stage1_name=$(echo "$stage1_name" | sed 's/"/\\"/g')
+                    escaped_stage1_description=$(echo "$stage1_description" | sed 's/"/\\"/g')
+                    stage1_json="{\"StageNumber\":1,\"StageName\":\"$escaped_stage1_name\",\"Approvers\":[$stage1_approvers_list],\"RequiredCount\":$stage1_required,\"AutoAdvance\":true,\"Description\":\"$escaped_stage1_description\"}"
                     workflow_stages="$stage1_json"
                     
                     stage_count=1
@@ -548,12 +559,13 @@ while true; do
                         stage_count=$((stage_count + 1))
                         echo -e "${BLUE}--- Stage $stage_count ---${NC}"
                         read -p "Enter stage name: " stageName
+                        read -p "Enter description for Stage $stage_count (optional): " stageDescription
                         
                         # Use enhanced approver group selection
                         echo ""
-                        echo -e "${BLUE}Select approvers for stage :${NC}"
+                        echo -e "${BLUE}Select approvers for stage $stage_count:${NC}"
                         stage_approvers_json=$(collect_approver_group)
-                        stage_approvers_list=$(echo "$stage_approvers_json" | sed 's/^\[//' | sed 's/\]$//')
+                        stage_approvers_list=$(echo "$stage_approvers_json" | sed 's/^\[\\\"/\"/' | sed 's/\\\"\]$/\"/' | sed 's/\\\",\\\"/\",\"/g')
                         
                         echo ""
                         read -p "Required approval count (default: ALL): " requiredCount
@@ -566,9 +578,10 @@ while true; do
                             autoAdvance="false"
                         fi
                         
-                        # Build stage JSON
+                        # Build stage JSON without escaping (for raw JSON)
                         escaped_stageName=$(echo "$stageName" | sed 's/"/\\"/g')
-                        stage_json="{\"StageNumber\":$stage_count,\"StageName\":\"$escaped_stageName\",\"Approvers\":[$stage_approvers_list],\"RequiredCount\":$requiredCount,\"AutoAdvance\":$autoAdvance,\"Description\":\"\"}"
+                        escaped_stageDescription=$(echo "$stageDescription" | sed 's/"/\\"/g')
+                        stage_json="{\"StageNumber\":$stage_count,\"StageName\":\"$escaped_stageName\",\"Approvers\":[$stage_approvers_list],\"RequiredCount\":$requiredCount,\"AutoAdvance\":$autoAdvance,\"Description\":\"$escaped_stageDescription\"}"
                         
                         workflow_stages="$workflow_stages,$stage_json"
                         
@@ -599,9 +612,8 @@ while true; do
                     fi
                     
                     # Advanced mode arguments: validDecisionsJSON, approversJSON, workflowJSON, deadlineHours, stageDeadlineHours
-                    # Escape quotes in workflow_stages for JSON context
-                    escaped_workflow_stages=$(echo "$workflow_stages" | sed 's/"/\\"/g')
-                    args+=("$id" "$title" "$description" "$hash" "$uploader" "$decisions" "" "$escaped_workflow_stages" "" "$stageDeadlineHours")
+                    # For the workflow parameter, we need to pass the JSON as-is, not as a quoted string
+                    args+=("$id" "$title" "$description" "$hash" "$uploader" "$decisions" "" "$workflow_stages" "" "$stageDeadlineHours")
                     
                 else
                     # SIMPLE MODE: Single-stage workflow
@@ -887,7 +899,11 @@ while true; do
                 # The third parameter (stages_json) needs to be escaped as a string
                 escaped_stages=$(echo "${args[2]}" | sed 's/"/\\"/g')
                 args_json="[\"${args[0]}\",\"${args[1]}\",\"$escaped_stages\"]"
-            # No special JSON handling needed for new embedded deadline functions
+            elif [[ "$func_name" == "SubmitDocument" && ${#args[@]} -eq 10 && "${args[7]}" != "" ]]; then
+                # For SubmitDocument with workflow JSON (advanced mode)
+                # args[7] contains the workflow JSON that should be escaped as a string parameter
+                escaped_workflow=$(echo "${args[7]}" | sed 's/"/\\"/g')
+                args_json="[\"${args[0]}\",\"${args[1]}\",\"${args[2]}\",\"${args[3]}\",\"${args[4]}\",\"${args[5]}\",\"${args[6]}\",\"$escaped_workflow\",\"${args[8]}\",\"${args[9]}\"]"
             else
                 # Regular parameter handling - quote all parameters
                 args_json=$(printf '"%s",' "${args[@]}")

@@ -17,7 +17,7 @@ func addToUserList(user string, list []string) []string {
 
 // removeFromUserList removes a user from a list
 func removeFromUserList(userToRemove string, list []string) []string {
-	var newList []string
+	newList := make([]string, 0) // FIX: Initialize as empty slice, not nil slice for Fabric compatibility
 	for _, user := range list {
 		if user != userToRemove {
 			newList = append(newList, user)

@@ -2,6 +2,8 @@ package chaincode
 
 import (
 	"fmt"
+	"sort"
+	"time"
 )
 
 // detectChanges compares current document state with desired new state
@@ -16,17 +18,44 @@ func (s *SmartContract) detectChanges(current Document, newState NewVersionState
 		}
 	}
 
-	// Approvers change detection
-	if len(newState.ApproversList) > 0 {
+	// Stage updates change detection
+	if len(newState.StageUpdates) > 0 {
+		// Extract all current approvers from all stages
 		currentApprovers := s.extractAllApprovers(current.Workflow.Stages)
-		changes.ApproversAdded = s.findAdded(currentApprovers, newState.ApproversList)
-		changes.ApproversRemoved = s.findRemoved(currentApprovers, newState.ApproversList)
+
+		// DETERMINISM FIX: Sort stage keys to ensure consistent processing order across all peers
+		var sortedStageKeys []string
+		for stageKey := range newState.StageUpdates {
+			sortedStageKeys = append(sortedStageKeys, stageKey)
+		}
+		sort.Strings(sortedStageKeys)
+
+		// Extract all new approvers from stage updates (in deterministic order)
+		var newApprovers []string
+		for _, stageKey := range sortedStageKeys {
+			stageUpdate := newState.StageUpdates[stageKey]
+			newApprovers = append(newApprovers, stageUpdate.Approvers...)
+		}
+
+		// Remove duplicates for accurate comparison
+		newApprovers = s.removeDuplicates(newApprovers)
+
+		changes.ApproversAdded = s.findAdded(currentApprovers, newApprovers)
+		changes.ApproversRemoved = s.findRemoved(currentApprovers, newApprovers)
 	}
 
-	// Decisions change detection
+	// Decisions change detection - compare against the last version's ValidDecisions, not current document state
 	if len(newState.ValidDecisions) > 0 {
-		changes.DecisionsAdded = s.findAdded(current.ValidDecisions, newState.ValidDecisions)
-		changes.DecisionsRemoved = s.findRemoved(current.ValidDecisions, newState.ValidDecisions)
+		var previousValidDecisions []string
+		if len(current.Versions) > 0 {
+			// Use the last version's ValidDecisions for comparison
+			previousValidDecisions = current.Versions[len(current.Versions)-1].ValidDecisions
+		} else {
+			// Use current document ValidDecisions if no versions exist yet
+			previousValidDecisions = current.ValidDecisions
+		}
+		changes.DecisionsAdded = s.findAdded(previousValidDecisions, newState.ValidDecisions)
+		changes.DecisionsRemoved = s.findRemoved(previousValidDecisions, newState.ValidDecisions)
 	}
 
 	// Calculate reconsideration rules based on detected changes
@@ -95,7 +124,7 @@ func (s *SmartContract) findRemoved(currentList, newList []string) []string {
 }
 
 // validateReconsiderationAttempt checks if approval is a reconsideration and validates rules
-func (s *SmartContract) validateReconsiderationAttempt(doc *Document, approver, currentTimestamp string) error {
+func (s *SmartContract) validateReconsiderationAttempt(doc *Document, approver string) error {
 	if len(doc.Versions) < 2 {
 		return nil // No reconsideration rules for first version
 	}
@@ -106,6 +135,25 @@ func (s *SmartContract) validateReconsiderationAttempt(doc *Document, approver, 
 
 		// Get the last version changes to determine reconsideration rules
 		lastVersion := doc.Versions[len(doc.Versions)-1]
+
+		// CRITICAL FIX: Check timestamp validity for reconsideration
+		// Approver can only reconsider if their last decision was made BEFORE the current version was created
+		approverTime, err := time.Parse(time.RFC3339, previousDecision.Timestamp)
+		if err != nil {
+			return fmt.Errorf("invalid approver timestamp format: %v", err)
+		}
+
+		versionTime, err := time.Parse(time.RFC3339, lastVersion.Timestamp)
+		if err != nil {
+			return fmt.Errorf("invalid version timestamp format: %v", err)
+		}
+
+		// If approver's decision was made AFTER the current version was created,
+		// then they already had a chance to reconsider and cannot do it again
+		if approverTime.After(versionTime) {
+			return fmt.Errorf("reconsideration not allowed - you already made a decision for version %d at %s (after version creation at %s)",
+				doc.LatestVersion, previousDecision.Timestamp, lastVersion.Timestamp)
+		}
 
 		// Determine what changed in the last version based on flags
 		contentChanged := false
@@ -119,6 +167,12 @@ func (s *SmartContract) validateReconsiderationAttempt(doc *Document, approver, 
 		}
 
 		// Apply reconsideration business rules
+
+		// PRIORITY RULE: Ownership transfers - no reconsideration allowed
+		if lastVersion.ChangeType == "ownership" {
+			return fmt.Errorf("reconsideration not allowed - ownership transfer in version %d does not require approver reconsideration", doc.LatestVersion)
+		}
+
 		if !contentChanged && !decisionsChanged && approversChanged {
 			// Only approver list changed - no reconsideration allowed
 			return fmt.Errorf("reconsideration not allowed - only approver list was modified in version %d", doc.LatestVersion)
@@ -210,4 +264,19 @@ func (s *SmartContract) validateReconsiderationDecision(doc *Document, approver,
 	}
 
 	return nil
+}
+
+// removeDuplicates removes duplicate strings from a slice
+func (s *SmartContract) removeDuplicates(items []string) []string {
+	seen := make(map[string]bool)
+	var result []string
+
+	for _, item := range items {
+		if !seen[item] {
+			seen[item] = true
+			result = append(result, item)
+		}
+	}
+
+	return result
 }

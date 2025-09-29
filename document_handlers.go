@@ -44,6 +44,7 @@ func (s *SmartContract) SubmitDocument(ctx contractapi.TransactionContextInterfa
 		Approvers        []string `json:"approvers"`
 		RequiredApprovals int     `json:"requiredApprovals"`
 		AutoAdvance      bool     `json:"autoAdvance"`
+		DeadlineHours    int      `json:"deadlineHours"` // 0 = no deadline, >0 = deadline in hours
 	}
 	
 	var stageInputs []StageInput
@@ -120,12 +121,32 @@ func (s *SmartContract) SubmitDocument(ctx contractapi.TransactionContextInterfa
 			AutomationHooks:   []AutomationHook{},
 		},
 		DeadlineStatus: DeadlineStatus{
-			DocumentId:        id,
-			OverallStatus:     "NONE",
-			StageStatuses:     make(map[string]StageDeadlineStatus),
-			WarningsTriggered: []DeadlineWarning{},
-			BreachesRecorded:  []DeadlineBreach{},
+			DocumentId:         id,
+			CurrentStageStatus: "NONE",
+			StageStatuses:      make(map[string]StageDeadlineStatus),
+			WarningsTriggered:  []DeadlineWarning{},
+			BreachesRecorded:   []DeadlineBreach{},
 		},
+	}
+
+	// Process stage deadlines from input
+	for i, input := range stageInputs {
+		if input.DeadlineHours > 0 {
+			stageKey := fmt.Sprintf("stage_%d", i+1)
+			deadline := calculateDeadlineFromHours(input.DeadlineHours)
+			doc.DeadlineConfig.StageDeadlines[stageKey] = deadline
+			doc.DeadlineStatus.StageStatuses[stageKey] = StageDeadlineStatus{
+				StageNumber:   i + 1,
+				Deadline:      deadline,
+				Status:        "ACTIVE",
+				TimeRemaining: int64(input.DeadlineHours * 3600), // hours to seconds
+			}
+			// Enable deadlines if any stage has deadline
+			doc.DeadlineConfig.Enabled = true
+			if doc.DeadlineStatus.CurrentStageStatus == "NONE" {
+				doc.DeadlineStatus.CurrentStageStatus = "ACTIVE"
+			}
+		}
 	}
 
 	// Initialize arrays and maps

@@ -3,7 +3,6 @@ package chaincode
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
@@ -150,72 +149,62 @@ func (s *SmartContract) RemovePrivilegedEditor(ctx contractapi.TransactionContex
 	return s.emitEvent(ctx, "PrivilegedEditorRemoved", invokerId, description, doc.ID, doc.LatestVersion, details)
 }
 
-// UpdateDocumentApprovers updates the list of approvers for a document
-func (s *SmartContract) UpdateDocumentApprovers(ctx contractapi.TransactionContextInterface, documentID string, newApproversJSON string, invokerId string) error {
+// UpdateDocumentApprovers updates approvers for specific workflow stages using sophisticated multi-stage approach
+func (s *SmartContract) UpdateDocumentApprovers(ctx contractapi.TransactionContextInterface, documentID, stageUpdatesJSON, invokerId string, resetApprovals bool) error {
 	timestamp := time.Now().Format(time.RFC3339)
 
+	// Parse the stage updates (same sophisticated approach as SubmitNewVersion)
+	var stageUpdates map[string]StageUpdate
+	if err := json.Unmarshal([]byte(stageUpdatesJSON), &stageUpdates); err != nil {
+		return fmt.Errorf("invalid stageUpdates JSON: %v", err)
+	}
+
+	// Load document and validate authorization
 	doc, err := s.loadDocument(ctx, documentID)
 	if err != nil {
 		return err
 	}
 
-	if err := s.validateEditorManagement(invokerId, doc); err != nil {
+	if err := s.validateAuthorization(invokerId, doc, "edit"); err != nil {
 		return err
 	}
 
-	var newApprovers []string
-	if err := json.Unmarshal([]byte(newApproversJSON), &newApprovers); err != nil {
-		return fmt.Errorf("invalid newApprovers JSON: %v", err)
-	}
-
+	// Store old approvers for event
 	oldApprovers := createDeterministicApproversList(doc.ApprovalsMap)
-	doc.ApprovalsMap = rebuildApprovalsMap(doc.ApprovalsMap, newApprovers, timestamp)
-	synchronizeWorkflowApprovers(doc, newApprovers)
 
-	doc.LastModifiedTimestamp = timestamp
-	doc.LatestVersion++
+	// CRITICAL FIX: Remove duplicate updateWorkflowStages call
+	// Let applyVersionChanges handle all workflow modifications to prevent double-modification bug
 
-	currentHash := "APPROVERS_UPDATED"
-	if len(doc.Versions) > 0 {
-		currentHash = doc.Versions[len(doc.Versions)-1].Hash
+	// Create new version using the same approach as SubmitNewVersion with proper change detection
+	newState := NewVersionState{
+		ContentHash:    doc.Versions[len(doc.Versions)-1].Hash, // Keep same content hash
+		StageUpdates:   stageUpdates,
+		ValidDecisions: doc.ValidDecisions, // Keep same valid decisions
+		ResetApprovals: resetApprovals,
+		ChangeReason:   "Approvers updated",
 	}
 
-	currentApprovals := make(map[string]Decision)
-	for k, v := range doc.ApprovalsMap {
-		currentApprovals[k] = v
+	// Detect changes properly (same as SubmitNewVersion)
+	changes := s.detectChanges(*doc, newState)
+
+	// Apply version changes with calculated changes
+	if err := s.applyVersionChanges(doc, newState, changes, timestamp, invokerId); err != nil {
+		return err
 	}
 
-	// Create workflow snapshot for version history
-	workflowSnapshot := &WorkflowSnapshot{
-		Enabled:            doc.Workflow.Enabled,
-		CurrentStage:       doc.Workflow.CurrentStage,
-		CompletedStages:    append([]int{}, doc.Workflow.CompletedStages...),
-		TotalStages:        len(doc.Workflow.Stages),
-		CompletionTimestamp: timestamp,
-	}
-
-	newVersion := DocumentVersion{
-		Version:          doc.LatestVersion,
-		Hash:            currentHash,
-		Submitter:       invokerId,
-		Timestamp:       timestamp,
-		ApprovalsMap:    currentApprovals,
-		ValidDecisions:  append([]string{}, doc.ValidDecisions...),
-		ApproversChanged: true,
-		DecisionsChanged: false,
-		WorkflowSnapshot: workflowSnapshot,
-	}
-	doc.Versions = append(doc.Versions, newVersion)
-
+	// Save document
 	if err := s.saveDocument(ctx, doc); err != nil {
 		return err
 	}
 
-	sort.Strings(newApprovers)
+	// Emit event
+	newApprovers := createDeterministicApproversList(doc.ApprovalsMap)
 	description := fmt.Sprintf("Approvers updated for document %s by %s", documentID, invokerId)
 	details := map[string]interface{}{
-		"oldApprovers": oldApprovers,
-		"newApprovers": newApprovers,
+		"oldApprovers":   oldApprovers,
+		"newApprovers":   newApprovers,
+		"resetApprovals": resetApprovals,
+		"stageUpdates":   stageUpdates,
 	}
 
 	return s.emitEvent(ctx, "ApproversUpdated", invokerId, description, doc.ID, doc.LatestVersion, details)
@@ -342,6 +331,14 @@ func (s *SmartContract) AcceptOwnershipTransfer(ctx contractapi.TransactionConte
 	doc.LatestVersion++
 	doc.LastModifiedTimestamp = timestamp
 
+	// CRITICAL FIX: Store VersionWorkflows for ownership transfer (was missing!)
+	if doc.VersionWorkflows == nil {
+		doc.VersionWorkflows = make(map[string]*WorkflowConfig)
+	}
+	// Store the workflow state for the new version
+	newVersionWorkflowState := s.deepCopyWorkflowConfig(doc.Workflow)
+	doc.VersionWorkflows[fmt.Sprintf("%d", doc.LatestVersion)] = &newVersionWorkflowState
+
 	// Get current hash from latest version or set default
 	currentHash := "OWNERSHIP_TRANSFERRED"
 	if len(doc.Versions) > 0 {
@@ -355,13 +352,7 @@ func (s *SmartContract) AcceptOwnershipTransfer(ctx contractapi.TransactionConte
 	}
 
 	// Create workflow snapshot for version history
-	workflowSnapshot := &WorkflowSnapshot{
-		Enabled:            doc.Workflow.Enabled,
-		CurrentStage:       doc.Workflow.CurrentStage,
-		CompletedStages:    append([]int{}, doc.Workflow.CompletedStages...),
-		TotalStages:        len(doc.Workflow.Stages),
-		CompletionTimestamp: timestamp,
-	}
+	workflowSnapshot := s.createWorkflowSnapshot(doc.Workflow, timestamp)
 
 	// Create new version entry
 	newVersion := DocumentVersion{

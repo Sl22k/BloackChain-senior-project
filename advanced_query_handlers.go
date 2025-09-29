@@ -166,19 +166,11 @@ func (s *SmartContract) GetDocumentSummary(ctx contractapi.TransactionContextInt
 }
 
 
-// UpdateValidDecisions updates the list of valid decisions for a document
-func (s *SmartContract) UpdateValidDecisions(ctx contractapi.TransactionContextInterface, documentID string, newDecisionsJSON string, invokerId string) error {
+// UpdateValidDecisions updates the list of valid decisions for a document using sophisticated approach
+func (s *SmartContract) UpdateValidDecisions(ctx contractapi.TransactionContextInterface, documentID, newDecisionsJSON, invokerId string) error {
 	timestamp := time.Now().Format(time.RFC3339)
 
-	doc, err := s.loadDocument(ctx, documentID)
-	if err != nil {
-		return err
-	}
-
-	if !s.isUserInList(invokerId, doc.PrivilegedEditors) {
-		return fmt.Errorf("invoker %s is not a privileged editor for document %s", invokerId, documentID)
-	}
-
+	// Parse new decisions
 	var newDecisions []string
 	if err := json.Unmarshal([]byte(newDecisionsJSON), &newDecisions); err != nil {
 		return fmt.Errorf("invalid newDecisions JSON: %v", err)
@@ -189,47 +181,46 @@ func (s *SmartContract) UpdateValidDecisions(ctx contractapi.TransactionContextI
 		return fmt.Errorf("at least one valid decision must be provided")
 	}
 
+	// Load document and validate authorization
+	doc, err := s.loadDocument(ctx, documentID)
+	if err != nil {
+		return err
+	}
+
+	if err := s.validateAuthorization(invokerId, doc, "edit"); err != nil {
+		return err
+	}
+
+	// Store old decisions for event
 	oldDecisions := make([]string, len(doc.ValidDecisions))
 	copy(oldDecisions, doc.ValidDecisions)
 
+	// Update valid decisions
 	doc.ValidDecisions = newDecisions
-	doc.LastModifiedTimestamp = timestamp
 
-	// Increment version for decision changes
-	doc.LatestVersion++
-
-	// Create new version entry
-	currentApprovals := make(map[string]Decision)
-	for k, v := range doc.ApprovalsMap {
-		currentApprovals[k] = v
+	// Create new version using the same sophisticated approach as SubmitNewVersion with proper change detection
+	newState := NewVersionState{
+		ContentHash:    doc.Versions[len(doc.Versions)-1].Hash, // Keep same content hash
+		StageUpdates:   map[string]StageUpdate{},              // No stage updates for decision changes
+		ValidDecisions: newDecisions,                          // New valid decisions
+		ResetApprovals: false,                                 // Don't reset approvals for decision changes
+		ChangeReason:   "Valid decisions updated",
 	}
 
-	// Create workflow snapshot for version history
-	workflowSnapshot := &WorkflowSnapshot{
-		Enabled:            doc.Workflow.Enabled,
-		CurrentStage:       doc.Workflow.CurrentStage,
-		CompletedStages:    append([]int{}, doc.Workflow.CompletedStages...),
-		TotalStages:        len(doc.Workflow.Stages),
-		CompletionTimestamp: timestamp,
+	// Detect changes properly (same as SubmitNewVersion)
+	changes := s.detectChanges(*doc, newState)
+
+	// Apply version changes with calculated changes
+	if err := s.applyVersionChanges(doc, newState, changes, timestamp, invokerId); err != nil {
+		return err
 	}
 
-	newVersion := DocumentVersion{
-		Version:          doc.LatestVersion,
-		Hash:             "DECISIONS_UPDATED",
-		Submitter:        invokerId,
-		Timestamp:        timestamp,
-		ApprovalsMap:     currentApprovals,
-		ValidDecisions:   append([]string{}, newDecisions...),
-		ApproversChanged: false,
-		DecisionsChanged: true,
-		WorkflowSnapshot: workflowSnapshot,
-	}
-	doc.Versions = append(doc.Versions, newVersion)
-
+	// Save document
 	if err := s.saveDocument(ctx, doc); err != nil {
 		return err
 	}
 
+	// Emit event
 	description := fmt.Sprintf("Valid decisions updated for document %s by %s", documentID, invokerId)
 	details := map[string]interface{}{
 		"oldDecisions": oldDecisions,
@@ -335,6 +326,11 @@ func (s *SmartContract) getQueryResult(ctx contractapi.TransactionContextInterfa
 		var doc Document
 		if err := json.Unmarshal(queryResponse.Value, &doc); err != nil {
 			return nil, err
+		}
+
+		// Fix deadline status to be consistent with QueryDocumentStatus
+		if deadlineStatus, err := s.GetDeadlineStatus(ctx, doc.ID); err == nil {
+			doc.DeadlineStatus = deadlineStatus
 		}
 
 		documents = append(documents, &doc)

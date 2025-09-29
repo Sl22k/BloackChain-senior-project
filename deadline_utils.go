@@ -18,7 +18,7 @@ func calculateDeadlineStatus(deadlineRFC3339 string, warningThreshold int) (stri
 		return "", 0, fmt.Errorf("invalid deadline format: %v", err)
 	}
 
-	hoursRemaining := int64(deadline.Sub(time.Now()).Hours())
+	hoursRemaining := int64(time.Until(deadline).Hours())
 
 	status := "active"
 	if hoursRemaining < 0 {
@@ -45,17 +45,11 @@ func validateDeadlineHours(deadlineHours string) (int, error) {
 }
 
 // createDefaultDeadlineConfig creates a default deadline configuration
-func createDefaultDeadlineConfig(enabled bool, deadlineRFC3339 string, hours int) DeadlineConfig {
-	warningThreshold := 1
-	if hours/4 > 1 {
-		warningThreshold = hours / 4
-	}
-
+func createDefaultDeadlineConfig(enabled bool) DeadlineConfig {
 	return DeadlineConfig{
 		Enabled:           enabled,
-		DocumentDeadline:  deadlineRFC3339,
 		StageDeadlines:    make(map[string]string),
-		WarningThreshold:  warningThreshold,
+		WarningThreshold:  24, // Default 24 hour warning
 		AutoReject:        false,
 		EscalationEnabled: false,
 		EscalationTargets: []string{},
@@ -66,13 +60,13 @@ func createDefaultDeadlineConfig(enabled bool, deadlineRFC3339 string, hours int
 // createDefaultDeadlineStatus creates a default deadline status
 func createDefaultDeadlineStatus(documentId, status, deadlineRFC3339 string, hoursRemaining int64) DeadlineStatus {
 	return DeadlineStatus{
-		DocumentId:        documentId,
-		OverallStatus:     status,
-		DocumentDeadline:  deadlineRFC3339,
-		TimeRemaining:     hoursRemaining,
-		StageStatuses:     make(map[string]StageDeadlineStatus),
-		WarningsTriggered: []DeadlineWarning{},
-		BreachesRecorded:  []DeadlineBreach{},
+		DocumentId:           documentId,
+		CurrentStageStatus:   status,
+		CurrentStageDeadline: deadlineRFC3339,
+		TimeRemaining:        hoursRemaining,
+		StageStatuses:        make(map[string]StageDeadlineStatus),
+		WarningsTriggered:    []DeadlineWarning{},
+		BreachesRecorded:     []DeadlineBreach{},
 	}
 }
 
@@ -83,6 +77,6 @@ func isDeadlineInRange(deadlineRFC3339 string, hoursAhead int) (bool, float64, e
 		return false, 0, err
 	}
 
-	hoursRemaining := deadline.Sub(time.Now()).Hours()
+	hoursRemaining := time.Until(deadline).Hours()
 	return hoursRemaining >= 0 && hoursRemaining <= float64(hoursAhead), hoursRemaining, nil
 }

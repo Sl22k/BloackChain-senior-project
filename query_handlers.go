@@ -47,10 +47,18 @@ func (s *SmartContract) QueryDocumentStatus(ctx contractapi.TransactionContextIn
 		}
 	}
 
-	// Ensure WorkflowSnapshot exists in all versions (schema requirement)
+	// Ensure WorkflowSnapshot exists and is current for all versions
 	for i := range doc.Versions {
-		if doc.Versions[i].WorkflowSnapshot == nil {
-			// Create a proper WorkflowSnapshot for this version
+		// CRITICAL FIX: Always refresh WorkflowSnapshot to reflect current VersionWorkflows state
+		// This fixes the bug where snapshots showed stale data even after approvals
+		versionKey := fmt.Sprintf("%d", doc.Versions[i].Version)
+
+		// Try to get the workflow state for this specific version
+		if doc.VersionWorkflows != nil && doc.VersionWorkflows[versionKey] != nil {
+			// Use the current workflow state for this version (now properly synchronized)
+			doc.Versions[i].WorkflowSnapshot = s.createWorkflowSnapshot(*doc.VersionWorkflows[versionKey], doc.Versions[i].Timestamp)
+		} else {
+			// Fallback: Use current workflow state (maintains backward compatibility)
 			doc.Versions[i].WorkflowSnapshot = s.createWorkflowSnapshot(doc.Workflow, doc.Versions[i].Timestamp)
 		}
 	}
@@ -128,10 +136,17 @@ func (s *SmartContract) QueryDocumentStatus(ctx contractapi.TransactionContextIn
 		ValidDecisions:    doc.ValidDecisions,
 		Workflow:          doc.Workflow,
 		CurrentStageInfo:  currentStageInfo,
+		PendingOwnershipTransfer: doc.PendingOwnershipTransfer, // FIX: Include ownership transfer data
 		WorkflowProgress:  workflowProgress,
 		// VersionWorkflows field removed - use GetDocumentHistory() for version workflows
 		DeadlineConfig:    doc.DeadlineConfig,
-		DeadlineStatus:    doc.DeadlineStatus,
+		DeadlineStatus:    func() DeadlineStatus {
+			deadlineStatus, err := s.GetDeadlineStatus(ctx, doc.ID)
+			if err != nil {
+				return doc.DeadlineStatus // Fallback to stored data if calculation fails
+			}
+			return deadlineStatus
+		}(),
 		CreatedTimestamp:      doc.CreatedTimestamp,
 		LastModifiedTimestamp: doc.LastModifiedTimestamp,
 	}

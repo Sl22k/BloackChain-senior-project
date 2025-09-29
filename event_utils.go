@@ -9,7 +9,7 @@ import (
 )
 
 // getCurrentDateTime returns current date and time in consistent formats
-func (s *SmartContract) getCurrentDateTime(ctx contractapi.TransactionContextInterface) (string, string, error) {
+func (s *SmartContract) getCurrentDateTime() (string, string, error) {
 	now := time.Now()
 	date := now.Format("2006-01-02")
 	timestamp := now.Format(time.RFC3339)

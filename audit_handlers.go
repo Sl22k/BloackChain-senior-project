@@ -140,8 +140,18 @@ func (s *SmartContract) ensureAllWorkflowFieldsInitialized(doc *Document) {
 		}
 		// Ensure WorkflowSnapshot is initialized
 		if doc.Versions[i].WorkflowSnapshot == nil {
+			// BUG FIX: Use version-specific workflow state instead of current workflow
+			versionKey := fmt.Sprintf("%d", doc.Versions[i].Version)
 			timestamp := time.Now().Format(time.RFC3339)
-			doc.Versions[i].WorkflowSnapshot = s.createWorkflowSnapshot(doc.Workflow, timestamp)
+
+			// Try to get the workflow state for this specific version
+			if doc.VersionWorkflows != nil && doc.VersionWorkflows[versionKey] != nil {
+				// Use the historical workflow state for this version
+				doc.Versions[i].WorkflowSnapshot = s.createWorkflowSnapshot(*doc.VersionWorkflows[versionKey], timestamp)
+			} else {
+				// Fallback: Use current workflow state (maintains backward compatibility)
+				doc.Versions[i].WorkflowSnapshot = s.createWorkflowSnapshot(doc.Workflow, timestamp)
+			}
 		}
 		// Ensure CompletionTimestamp is never nil
 		if doc.Versions[i].WorkflowSnapshot.CompletionTimestamp == "" {
@@ -164,8 +174,8 @@ func (s *SmartContract) ensureAllWorkflowFieldsInitialized(doc *Document) {
 	if doc.DeadlineStatus.DocumentId == "" && doc.ID != "" {
 		doc.DeadlineStatus.DocumentId = doc.ID
 	}
-	if doc.DeadlineStatus.OverallStatus == "" {
-		doc.DeadlineStatus.OverallStatus = "NONE"
+	if doc.DeadlineStatus.CurrentStageStatus == "" {
+		doc.DeadlineStatus.CurrentStageStatus = "NONE"
 	}
 	if doc.DeadlineStatus.StageStatuses == nil {
 		doc.DeadlineStatus.StageStatuses = make(map[string]StageDeadlineStatus)

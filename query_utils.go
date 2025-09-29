@@ -69,12 +69,22 @@ func (s *SmartContract) copyApprovalsMap(source map[string]Decision) map[string]
 
 // createWorkflowSnapshot creates a snapshot of current workflow state for version history
 func (s *SmartContract) createWorkflowSnapshot(workflow WorkflowConfig, timestamp string) *WorkflowSnapshot {
+	// Determine if workflow is completed (all stages done)
+	var completionTimestamp string
+	if workflow.Enabled && len(workflow.CompletedStages) == len(workflow.Stages) && len(workflow.Stages) > 0 {
+		// Workflow is fully completed
+		completionTimestamp = timestamp
+	} else {
+		// Workflow is not completed - leave empty string
+		completionTimestamp = ""
+	}
+
 	snapshot := &WorkflowSnapshot{
 		Enabled:             workflow.Enabled,
 		CurrentStage:        workflow.CurrentStage,
 		CompletedStages:     make([]int, len(workflow.CompletedStages)),
 		TotalStages:         len(workflow.Stages),
-		CompletionTimestamp: timestamp,
+		CompletionTimestamp: completionTimestamp,
 	}
 
 	// Copy completed stages

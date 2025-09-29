@@ -69,30 +69,51 @@ func calculateStatusCounts(approvalsMap map[string]Decision) map[string]int {
 	return statusCounts
 }
 
-// determineDocumentStatus determines document status based on decision counts
-func (s *SmartContract) determineDocumentStatus(decisionCounts map[string]int, validDecisions []string) string {
+// determineDocumentStatus determines document status based on workflow state and enum comparison
+func (s *SmartContract) determineDocumentStatus(doc *Document, decisionCounts map[string]int) string {
 	if len(decisionCounts) == 0 {
-		return "PENDING"
+		return "🟡 PENDING"
 	}
 
-	// Check for approved status (default priority)
-	if decisionCounts["APPROVED"] > 0 {
-		return "APPROVED"
+	// For workflow-enabled documents, status depends on stage completion
+	if doc.Workflow.Enabled {
+		// Check if workflow is fully completed (ALL stages done)
+		if len(doc.Workflow.CompletedStages) == len(doc.Workflow.Stages) && len(doc.Workflow.Stages) > 0 {
+			return "✅ APPROVED"
+		}
+
+		// Check for blocking rejections using enum constants
+		if decisionCounts[string(Rejected)] > 0 {
+			return "❌ REJECTED"
+		}
+
+		// Check for needs revision (using actual valid decisions from document)
+		for _, validDecision := range doc.ValidDecisions {
+			if strings.Contains(validDecision, "NEEDS_REVISION") && decisionCounts[validDecision] > 0 {
+				return validDecision
+			}
+		}
+
+		// Still in progress - not all stages completed
+		return "🟡 PENDING"
 	}
 
-	// Check for rejected status
-	if decisionCounts["REJECTED"] > 0 {
-		return "REJECTED"
+	// For simple documents (no workflow), use enum-based logic
+	if decisionCounts[string(Approved)] > 0 {
+		return "✅ APPROVED"
+	}
+	if decisionCounts[string(Rejected)] > 0 {
+		return "❌ REJECTED"
 	}
 
-	// Check for any other non-pending status
-	for _, decision := range validDecisions {
-		if decision != "PENDING" && decisionCounts[decision] > 0 {
-			return decision
+	// Check for any other non-pending status from valid decisions
+	for _, validDecision := range doc.ValidDecisions {
+		if !strings.Contains(validDecision, "PENDING") && decisionCounts[validDecision] > 0 {
+			return validDecision
 		}
 	}
 
-	return "PENDING"
+	return "🟡 PENDING"
 }
 
 // filterDocumentsByPendingApprovals filters documents that have pending approvals
@@ -134,7 +155,7 @@ func (s *SmartContract) calculateDocumentStatistics(docs []*Document) map[string
 	for _, doc := range docs {
 		// Calculate and count by status
 		docStatusCounts := calculateStatusCounts(doc.ApprovalsMap)
-		docStatus := s.determineDocumentStatus(docStatusCounts, doc.ValidDecisions)
+		docStatus := s.determineDocumentStatus(doc, docStatusCounts)
 		statusCounts[docStatus]++
 
 		// Count by uploader
@@ -167,7 +188,7 @@ func (s *SmartContract) calculateDocumentStatistics(docs []*Document) map[string
 // createDocumentSummary creates a summary map for a document
 func (s *SmartContract) createDocumentSummary(doc *Document) map[string]interface{} {
 	statusCounts := calculateStatusCounts(doc.ApprovalsMap)
-	currentStatus := s.determineDocumentStatus(statusCounts, doc.ValidDecisions)
+	currentStatus := s.determineDocumentStatus(doc, statusCounts)
 
 	summary := map[string]interface{}{
 		"id":                      doc.ID,
@@ -197,7 +218,16 @@ func (s *SmartContract) createDocumentSummary(doc *Document) map[string]interfac
 
 	// Add deadline info if enabled
 	if doc.DeadlineConfig.Enabled {
-		summary["documentDeadline"] = doc.DeadlineConfig.DocumentDeadline
+		// Show CURRENT STAGE deadline, not earliest stage deadline
+		var currentStageDeadline string
+		if doc.Workflow.Enabled && len(doc.DeadlineConfig.StageDeadlines) > 0 {
+			// Get current stage deadline
+			currentStageKey := fmt.Sprintf("stage_%d", doc.Workflow.CurrentStage)
+			if deadline, exists := doc.DeadlineConfig.StageDeadlines[currentStageKey]; exists && deadline != "" {
+				currentStageDeadline = deadline
+			}
+		}
+		summary["documentDeadline"] = currentStageDeadline
 	}
 
 	return summary

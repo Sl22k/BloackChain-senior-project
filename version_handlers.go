@@ -3,6 +3,9 @@ package chaincode
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
@@ -10,7 +13,7 @@ import (
 
 // SubmitNewVersion creates a new document version with unified modification approach
 // Supports content changes, approver list changes, and valid decisions changes in single operation
-func (s *SmartContract) SubmitNewVersion(ctx contractapi.TransactionContextInterface, documentID, newStateJSON string) error {
+func (s *SmartContract) SubmitNewVersion(ctx contractapi.TransactionContextInterface, documentID, submitter, newStateJSON string) error {
 	// Parse the new desired state
 	var newState NewVersionState
 	if err := json.Unmarshal([]byte(newStateJSON), &newState); err != nil {
@@ -22,6 +25,11 @@ func (s *SmartContract) SubmitNewVersion(ctx contractapi.TransactionContextInter
 	// Essential data integrity - load document
 	doc, err := s.loadDocument(ctx, documentID)
 	if err != nil {
+		return err
+	}
+
+	// Essential security - validate authorization
+	if err := s.validateAuthorization(submitter, doc, "edit"); err != nil {
 		return err
 	}
 
@@ -43,7 +51,7 @@ func (s *SmartContract) SubmitNewVersion(ctx contractapi.TransactionContextInter
 	}
 
 	// Apply changes and create new version
-	if err := s.applyVersionChanges(doc, newState, changes, timestamp); err != nil {
+	if err := s.applyVersionChanges(doc, newState, changes, timestamp, submitter); err != nil {
 		return fmt.Errorf("failed to apply version changes: %v", err)
 	}
 
@@ -81,18 +89,23 @@ func (s *SmartContract) SubmitNewVersion(ctx contractapi.TransactionContextInter
 }
 
 // applyVersionChanges applies all detected changes to create the new version
-func (s *SmartContract) applyVersionChanges(doc *Document, newState NewVersionState, changes DetectedChanges, timestamp string) error {
-	// Preserve current workflow state for version history
+func (s *SmartContract) applyVersionChanges(doc *Document, newState NewVersionState, changes DetectedChanges, timestamp, submitter string) error {
+	// Preserve current workflow state for version history (BEFORE modifications)
 	if doc.VersionWorkflows == nil {
 		doc.VersionWorkflows = make(map[string]*WorkflowConfig)
 	}
-	
-	currentWorkflowState := s.deepCopyWorkflowConfig(doc.Workflow)
-	doc.VersionWorkflows[fmt.Sprintf("%d", doc.LatestVersion)] = &currentWorkflowState
+
+	// Save the CURRENT version's state before we modify it (for previousStage reference)
+	previousVersionWorkflowState := s.deepCopyWorkflowConfig(doc.Workflow)
 
 	// Update document metadata
 	doc.LatestVersion++
 	doc.LastModifiedTimestamp = timestamp
+
+	// Store the previous version's workflow under the PREVIOUS version number
+	if doc.LatestVersion > 1 {
+		doc.VersionWorkflows[fmt.Sprintf("%d", doc.LatestVersion-1)] = &previousVersionWorkflowState
+	}
 
 	// Apply content changes
 	contentHash := newState.ContentHash
@@ -108,48 +121,77 @@ func (s *SmartContract) applyVersionChanges(doc *Document, newState NewVersionSt
 		doc.ValidDecisions = newState.ValidDecisions
 	}
 
-	// Apply approver changes by rebuilding workflow stages
-	if len(changes.ApproversAdded) > 0 || len(changes.ApproversRemoved) > 0 {
-		if err := s.updateWorkflowStages(doc, newState.ApproversList, timestamp); err != nil {
-			return fmt.Errorf("failed to update workflow stages: %v", err)
-		}
-		
-		// Rebuild ApprovalsMap with new approvers
-		doc.ApprovalsMap = s.createInitialApprovalsMap(doc.Workflow.Stages, timestamp)
-		
-		// If not resetting approvals, preserve existing approvals for unchanged approvers
-		if !newState.ResetApprovals && len(doc.Versions) > 0 {
-			lastVersionApprovals := doc.Versions[len(doc.Versions)-1].ApprovalsMap
-			for key, decision := range lastVersionApprovals {
-				if _, exists := doc.ApprovalsMap[key]; exists {
-					// Approver still exists, keep their previous decision
-					doc.ApprovalsMap[key] = decision
-				}
-			}
-		}
-	}
+	// Handle approval reset logic and add StageHistory entry FIRST
+	previousStage := previousVersionWorkflowState.CurrentStage
 
-	// Handle approval reset logic
 	if newState.ResetApprovals {
 		// Reset workflow to initial state
 		doc.Workflow.CurrentStage = 1
 		doc.Workflow.CompletedStages = []int{}
-		
-		// Reset all stage approvals
-		doc.Workflow.Stages = s.initializeStageApprovals(doc.Workflow.Stages, timestamp)
-		
-		// Reset ApprovalsMap to all pending
-		doc.ApprovalsMap = s.createInitialApprovalsMap(doc.Workflow.Stages, timestamp)
-		
-		// Reset stage history
-		doc.Workflow.StageHistory = []StageTransition{{
-			FromStage:  0,
+
+		// Add version reset entry to stage history
+		doc.Workflow.StageHistory = append(doc.Workflow.StageHistory, StageTransition{
+			FromStage:  previousStage,
 			ToStage:    1,
 			Transition: "version_reset",
-			Actor:      "",
+			Actor:      submitter,
 			Timestamp:  timestamp,
 			Comment:    fmt.Sprintf("Approvals reset for version %d: %s", doc.LatestVersion, newState.ChangeReason),
-		}}
+		})
+	} else {
+		// Add version update entry to stage history (preserving approvals)
+		doc.Workflow.StageHistory = append(doc.Workflow.StageHistory, StageTransition{
+			FromStage:  previousStage,
+			ToStage:    doc.Workflow.CurrentStage,
+			Transition: "version_update",
+			Actor:      submitter,
+			Timestamp:  timestamp,
+			Comment:    fmt.Sprintf("Version %d updated: %s", doc.LatestVersion, newState.ChangeReason),
+		})
+	}
+
+	// Apply stage updates using unified model (AFTER reset logic)
+	if len(newState.StageUpdates) > 0 {
+		if err := s.updateWorkflowStages(doc, newState.StageUpdates, timestamp); err != nil {
+			return fmt.Errorf("failed to update workflow stages: %v", err)
+		}
+
+		// Rebuild ApprovalsMap from all stages
+		doc.ApprovalsMap = s.createInitialApprovalsMap(doc.Workflow.Stages, timestamp)
+
+		// If not resetting approvals, preserve existing approvals for unchanged approvers
+		if !newState.ResetApprovals && len(doc.Versions) > 0 {
+			lastVersionApprovals := doc.Versions[len(doc.Versions)-1].ApprovalsMap
+
+			// DETERMINISM FIX: Sort keys to ensure consistent iteration order across all peers
+			var sortedKeys []string
+			for key := range lastVersionApprovals {
+				sortedKeys = append(sortedKeys, key)
+			}
+			sort.Strings(sortedKeys)
+
+			// Iterate in deterministic order
+			for _, key := range sortedKeys {
+				if _, exists := doc.ApprovalsMap[key]; exists {
+					// Approver still exists, keep their previous decision
+					doc.ApprovalsMap[key] = lastVersionApprovals[key]
+				}
+			}
+		}
+
+		// SYNC FIX: When preserving approvals, sync ApprovalsMap back to StageApprovals
+		if !newState.ResetApprovals {
+			s.syncApprovalsMapToStageApprovals(doc)
+		}
+	}
+
+	// CRITICAL FIX: Apply reset logic to stage approvals AFTER stage updates
+	if newState.ResetApprovals {
+		// Reset all stage approvals (but preserve updated stage configurations)
+		doc.Workflow.Stages = s.initializeStageApprovals(doc.Workflow.Stages, timestamp)
+
+		// Reset ApprovalsMap to all pending
+		doc.ApprovalsMap = s.createInitialApprovalsMap(doc.Workflow.Stages, timestamp)
 	}
 
 	// Create new version entry with proper approval snapshot
@@ -158,59 +200,75 @@ func (s *SmartContract) applyVersionChanges(doc *Document, newState NewVersionSt
 	newVersion := DocumentVersion{
 		Version:          doc.LatestVersion,
 		Hash:             contentHash,
-		Submitter:        "", // Will be set by caller context
+		Submitter:        submitter,
 		Timestamp:        timestamp,
 		ApprovalsMap:     newVersionApprovals,
 		ValidDecisions:   append([]string{}, doc.ValidDecisions...),
 		ApproversChanged: len(changes.ApproversAdded) > 0 || len(changes.ApproversRemoved) > 0,
 		DecisionsChanged: len(changes.DecisionsAdded) > 0 || len(changes.DecisionsRemoved) > 0,
+		ContentChanged:   changes.ContentChanged,
+		ChangeType:       s.determineChangeType(changes),
 		WorkflowSnapshot: s.createWorkflowSnapshot(doc.Workflow, timestamp),
 	}
 
 	doc.Versions = append(doc.Versions, newVersion)
 
-	// Store new workflow state
-	workflowCopy := s.deepCopyWorkflowConfig(doc.Workflow)
-	doc.VersionWorkflows[fmt.Sprintf("%d", doc.LatestVersion)] = &workflowCopy
-
-	// No synchronization functions needed - data is maintained correctly during operations
+	// Store the NEW version's workflow state (with updated StageHistory)
+	newVersionWorkflowState := s.deepCopyWorkflowConfig(doc.Workflow)
+	doc.VersionWorkflows[fmt.Sprintf("%d", doc.LatestVersion)] = &newVersionWorkflowState
 
 	return nil
 }
 
-// updateWorkflowStages rebuilds workflow stages with new approvers list
-func (s *SmartContract) updateWorkflowStages(doc *Document, newApproversList []string, timestamp string) error {
-	if len(doc.Workflow.Stages) == 0 {
-		return fmt.Errorf("cannot update approvers - document has no workflow stages")
+// updateWorkflowStages updates specific workflow stages with new configurations
+func (s *SmartContract) updateWorkflowStages(doc *Document, stageUpdates map[string]StageUpdate, timestamp string) error {
+	if len(stageUpdates) == 0 {
+		return nil // No stage updates requested
 	}
 
-	// For single stage documents, simply update the approvers list
-	if len(doc.Workflow.Stages) == 1 {
-		stage := &doc.Workflow.Stages[0]
-		stage.Approvers = newApproversList
-		
+	if len(doc.Workflow.Stages) == 0 {
+		return fmt.Errorf("cannot update stages - document has no workflow stages")
+	}
+
+	// DETERMINISM FIX: Sort stage keys to ensure consistent processing order across all peers
+	var sortedStageKeys []string
+	for stageKey := range stageUpdates {
+		sortedStageKeys = append(sortedStageKeys, stageKey)
+	}
+	sort.Strings(sortedStageKeys)
+
+	// Validate all stage numbers first (in deterministic order)
+	for _, stageKey := range sortedStageKeys {
+		stageNum, err := strconv.Atoi(stageKey)
+		if err != nil {
+			return fmt.Errorf("invalid stage number: %s", stageKey)
+		}
+		if stageNum < 1 || stageNum > len(doc.Workflow.Stages) {
+			return fmt.Errorf("stage %d does not exist (valid range: 1-%d)", stageNum, len(doc.Workflow.Stages))
+		}
+		if len(stageUpdates[stageKey].Approvers) == 0 {
+			return fmt.Errorf("stage %d cannot have empty approvers list", stageNum)
+		}
+	}
+
+	// Apply updates to specified stages (in deterministic order)
+	for _, stageKey := range sortedStageKeys {
+		update := stageUpdates[stageKey]
+		stageNum, _ := strconv.Atoi(stageKey) // Already validated above
+		stageIndex := stageNum - 1
+		stage := &doc.Workflow.Stages[stageIndex]
+
+		// Update stage configuration - DETERMINISM FIX: Sort approvers to ensure consistent order across all peers
+		sortedApprovers := make([]string, len(update.Approvers))
+		copy(sortedApprovers, update.Approvers)
+		sort.Strings(sortedApprovers)
+		stage.Approvers = sortedApprovers
+		stage.RequiredCount = update.RequiredCount
+		stage.AutoAdvance = update.AutoAdvance
+
 		// Reinitialize stage approvals for new approvers
 		stage.StageApprovals = make(map[string]Decision)
-		for _, approver := range newApproversList {
-			stage.StageApprovals[approver] = Decision{
-				Status:    Pending,
-				Comment:   "",
-				Timestamp: timestamp,
-			}
-		}
-		return nil
-	}
-
-	// For multi-stage documents, this is more complex
-	// For now, we'll update all stages with the same approvers list
-	// TODO: In future, frontend could specify approvers per stage
-	for i := range doc.Workflow.Stages {
-		stage := &doc.Workflow.Stages[i]
-		stage.Approvers = newApproversList
-		
-		// Reinitialize stage approvals
-		stage.StageApprovals = make(map[string]Decision)
-		for _, approver := range newApproversList {
+		for _, approver := range sortedApprovers {
 			stage.StageApprovals[approver] = Decision{
 				Status:    Pending,
 				Comment:   "",
@@ -220,4 +278,46 @@ func (s *SmartContract) updateWorkflowStages(doc *Document, newApproversList []s
 	}
 
 	return nil
+}
+
+// determineChangeType creates compound ChangeType based on detected changes
+func (s *SmartContract) determineChangeType(changes DetectedChanges) string {
+	var changeComponents []string
+
+	if changes.ContentChanged {
+		changeComponents = append(changeComponents, "content")
+	}
+	if len(changes.ApproversAdded) > 0 || len(changes.ApproversRemoved) > 0 {
+		changeComponents = append(changeComponents, "approvers")
+	}
+	if len(changes.DecisionsAdded) > 0 || len(changes.DecisionsRemoved) > 0 {
+		changeComponents = append(changeComponents, "decisions")
+	}
+
+	if len(changeComponents) == 0 {
+		return "metadata" // Fallback for edge cases
+	}
+
+	// Return compound change type like "content+approvers" or single type like "content"
+	return strings.Join(changeComponents, "+")
+}
+
+// syncApprovalsMapToStageApprovals synchronizes ApprovalsMap back to StageApprovals
+// This fixes the data inconsistency bug when resetApprovals=false
+func (s *SmartContract) syncApprovalsMapToStageApprovals(doc *Document) {
+	// Iterate through all stages
+	for i := range doc.Workflow.Stages {
+		stage := &doc.Workflow.Stages[i]
+
+		// For each approver in this stage, sync their approval from ApprovalsMap
+		for _, approver := range stage.Approvers {
+			if approval, exists := doc.ApprovalsMap[approver]; exists {
+				// Copy the approval from ApprovalsMap to StageApprovals
+				if stage.StageApprovals == nil {
+					stage.StageApprovals = make(map[string]Decision)
+				}
+				stage.StageApprovals[approver] = approval
+			}
+		}
+	}
 }

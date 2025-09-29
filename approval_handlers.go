@@ -24,7 +24,7 @@ func (s *SmartContract) ApproveDocument(ctx contractapi.TransactionContextInterf
 	timestamp := time.Now().Format(time.RFC3339)
 
 	// Reconsideration validation - check if this is a reconsideration attempt
-	if err := s.validateReconsiderationAttempt(doc, approver, timestamp); err != nil {
+	if err := s.validateReconsiderationAttempt(doc, approver); err != nil {
 		return err
 	}
 
@@ -109,12 +109,13 @@ func (s *SmartContract) ApproveDocument(ctx contractapi.TransactionContextInterf
 	doc.ApprovalsMap[approverKey] = newDecision
 
 	// Check if stage is complete and handle advancement
-	if status == Rejected {
+	switch status {
+	case Rejected:
 		// Document rejected - workflow stops here
 		// No need to advance stages on rejection
-	} else if status == Approved {
+	case Approved:
 		// Use enhanced stage advancement with proper notifications
-		if err := s.handleStageAdvancement(ctx, doc, currentStage, approver, timestamp); err != nil {
+		if err := s.handleStageAdvancement(ctx, doc, currentStage, approver); err != nil {
 			return err
 		}
 	}
@@ -123,6 +124,33 @@ func (s *SmartContract) ApproveDocument(ctx contractapi.TransactionContextInterf
 	if len(doc.Versions) > 0 {
 		latestVersionIndex := len(doc.Versions) - 1
 		doc.Versions[latestVersionIndex].ApprovalsMap[approverKey] = newDecision
+	}
+
+	// CRITICAL FIX: Update VersionWorkflows snapshot to maintain consistency
+	// This fixes the bug where version snapshots were frozen and not updated with approvals
+	versionKey := fmt.Sprintf("%d", doc.LatestVersion)
+	if doc.VersionWorkflows != nil && doc.VersionWorkflows[versionKey] != nil {
+		versionWorkflow := doc.VersionWorkflows[versionKey]
+		if currentStageIndex < len(versionWorkflow.Stages) {
+			// Initialize stage approvals map if needed
+			if versionWorkflow.Stages[currentStageIndex].StageApprovals == nil {
+				versionWorkflow.Stages[currentStageIndex].StageApprovals = make(map[string]Decision)
+			}
+
+			// Update the version workflow snapshot with the new approval
+			versionWorkflow.Stages[currentStageIndex].StageApprovals[approver] = newDecision
+
+			// Synchronize completed stages and current stage with live workflow
+			versionWorkflow.CompletedStages = make([]int, len(doc.Workflow.CompletedStages))
+			copy(versionWorkflow.CompletedStages, doc.Workflow.CompletedStages)
+			versionWorkflow.CurrentStage = doc.Workflow.CurrentStage
+
+			// CRITICAL FIX: Also update the stored WorkflowSnapshot in the version
+			if len(doc.Versions) > 0 {
+				latestVersionIndex := len(doc.Versions) - 1
+				doc.Versions[latestVersionIndex].WorkflowSnapshot = s.createWorkflowSnapshot(*versionWorkflow, timestamp)
+			}
+		}
 	}
 
 	// Update document modification time
